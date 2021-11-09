@@ -20,8 +20,10 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -29,18 +31,16 @@ import (
 	"github.com/minio/minio/internal/config/storageclass"
 	"github.com/minio/minio/internal/hash"
 	"github.com/minio/minio/internal/logger"
-	"github.com/tinylib/msgp/msgp"
 )
 
 // PoolDecommissionInfo currently decomissioning information
 type PoolDecommissionInfo struct {
-	StartTime   time.Time     `json:"startTime" msg:"st"`
-	StartSize   int64         `json:"startSize" msg:"ss"`
-	TotalSize   int64         `json:"totalSize" msg:"ts"`
-	Duration    time.Duration `json:"duration" msg:"du"`
-	CurrentSize int64         `json:"currentSize" msg:"cs"`
-	Complete    bool          `json:"complete" msg:"cmp"`
-	Failed      bool          `json:"failed" msg:"fl"`
+	StartTime   time.Time `json:"startTime" msg:"st"`
+	StartSize   int64     `json:"startSize" msg:"ss"`
+	TotalSize   int64     `json:"totalSize" msg:"ts"`
+	CurrentSize int64     `json:"currentSize" msg:"cs"`
+	Complete    bool      `json:"complete" msg:"cmp"`
+	Failed      bool      `json:"failed" msg:"fl"`
 }
 
 // PoolStatus captures current pool status
@@ -53,7 +53,7 @@ type PoolStatus struct {
 
 //go:generate msgp -file $GOFILE -unexported
 type poolMeta struct {
-	Version string       `msg:"v"`
+	Version int          `msg:"v"`
 	Pools   []PoolStatus `msg:"pls"`
 }
 
@@ -103,22 +103,44 @@ func (p poolMeta) IsSuspended(idx int) bool {
 func (p *poolMeta) load(ctx context.Context, set *erasureSets, sets []*erasureSets) (bool, error) {
 	gr, err := set.GetObjectNInfo(ctx, minioMetaBucket, poolMetaName,
 		nil, http.Header{}, readLock, ObjectOptions{})
-	if err != nil && !isErrObjectNotFound(err) {
+	if err != nil {
+		if isErrObjectNotFound(err) {
+			return true, nil
+		}
 		return false, err
 	}
-	if isErrObjectNotFound(err) {
+	defer gr.Close()
+	data, err := ioutil.ReadAll(gr)
+	if err != nil {
+		return false, err
+	}
+	if len(data) == 0 {
 		return true, nil
 	}
-	defer gr.Close()
+	if len(data) <= 4 {
+		return false, fmt.Errorf("poolMeta: no data")
+	}
+	// Read header
+	switch binary.LittleEndian.Uint16(data[0:2]) {
+	case poolMetaFormat:
+	default:
+		return false, fmt.Errorf("poolMeta: unknown format: %d", binary.LittleEndian.Uint16(data[0:2]))
+	}
+	switch binary.LittleEndian.Uint16(data[2:4]) {
+	case poolMetaVersion:
+	default:
+		return false, fmt.Errorf("poolMeta: unknown version: %d", binary.LittleEndian.Uint16(data[2:4]))
+	}
 
-	if err = p.DecodeMsg(msgp.NewReader(gr)); err != nil {
+	// OK, parse data.
+	if _, err = p.UnmarshalMsg(data[4:]); err != nil {
 		return false, err
 	}
 
 	switch p.Version {
-	case poolMetaV1:
+	case poolMetaVersionV1:
 	default:
-		return false, fmt.Errorf("unexpected pool meta version: %s", p.Version)
+		return false, fmt.Errorf("unexpected pool meta version: %d", p.Version)
 	}
 
 	// Total pools cannot reduce upon restart, but allow for
@@ -164,10 +186,17 @@ func (p poolMeta) Clone() poolMeta {
 }
 
 func (p poolMeta) save(ctx context.Context, sets []*erasureSets) error {
-	buf, err := p.MarshalMsg(nil)
+	data := make([]byte, 4, p.Msgsize()+4)
+
+	// Initialize the header.
+	binary.LittleEndian.PutUint16(data[0:2], poolMetaFormat)
+	binary.LittleEndian.PutUint16(data[2:4], poolMetaVersion)
+
+	buf, err := p.MarshalMsg(data)
 	if err != nil {
 		return err
 	}
+
 	br := bytes.NewReader(buf)
 	for _, set := range sets {
 		r, err := hash.NewReader(br, br.Size(), "", "", br.Size())
@@ -184,8 +213,10 @@ func (p poolMeta) save(ctx context.Context, sets []*erasureSets) error {
 }
 
 const (
-	poolMetaName = "pool.meta"
-	poolMetaV1   = "1"
+	poolMetaName      = "pool.meta"
+	poolMetaFormat    = 1
+	poolMetaVersionV1 = 1
+	poolMetaVersion   = poolMetaVersionV1
 )
 
 // Init() initializes pools and saves additional information about them
@@ -210,7 +241,7 @@ func (z *erasureServerPools) Init(ctx context.Context) error {
 	// looks like new pool was added we need to update,
 	// or this is a fresh installation (or an existing
 	// installation with pool removed)
-	meta.Version = "1"
+	meta.Version = poolMetaVersion
 	for idx, pool := range z.serverPools {
 		meta.Pools = append(meta.Pools, PoolStatus{
 			CmdLine:    pool.endpoints.CmdLine,
@@ -481,7 +512,6 @@ func (z *erasureServerPools) Status(ctx context.Context, idx int) (PoolStatus, e
 
 	poolInfo := z.poolMeta.Pools[idx]
 	if poolInfo.Decommission != nil {
-		poolInfo.Decommission.Duration = time.Since(poolInfo.Decommission.StartTime)
 		poolInfo.Decommission.CurrentSize = currentSize
 	} else {
 		poolInfo.Decommission = &PoolDecommissionInfo{

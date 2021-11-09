@@ -42,12 +42,6 @@ func (z *PoolDecommissionInfo) DecodeMsg(dc *msgp.Reader) (err error) {
 				err = msgp.WrapError(err, "TotalSize")
 				return
 			}
-		case "du":
-			err = z.Duration.DecodeMsg(dc)
-			if err != nil {
-				err = msgp.WrapError(err, "Duration")
-				return
-			}
 		case "cs":
 			z.CurrentSize, err = dc.ReadInt64()
 			if err != nil {
@@ -79,9 +73,9 @@ func (z *PoolDecommissionInfo) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *PoolDecommissionInfo) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 7
+	// map header, size 6
 	// write "st"
-	err = en.Append(0x87, 0xa2, 0x73, 0x74)
+	err = en.Append(0x86, 0xa2, 0x73, 0x74)
 	if err != nil {
 		return
 	}
@@ -108,16 +102,6 @@ func (z *PoolDecommissionInfo) EncodeMsg(en *msgp.Writer) (err error) {
 	err = en.WriteInt64(z.TotalSize)
 	if err != nil {
 		err = msgp.WrapError(err, "TotalSize")
-		return
-	}
-	// write "du"
-	err = en.Append(0xa2, 0x64, 0x75)
-	if err != nil {
-		return
-	}
-	err = z.Duration.EncodeMsg(en)
-	if err != nil {
-		err = msgp.WrapError(err, "Duration")
 		return
 	}
 	// write "cs"
@@ -156,9 +140,9 @@ func (z *PoolDecommissionInfo) EncodeMsg(en *msgp.Writer) (err error) {
 // MarshalMsg implements msgp.Marshaler
 func (z *PoolDecommissionInfo) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 7
+	// map header, size 6
 	// string "st"
-	o = append(o, 0x87, 0xa2, 0x73, 0x74)
+	o = append(o, 0x86, 0xa2, 0x73, 0x74)
 	o = msgp.AppendTime(o, z.StartTime)
 	// string "ss"
 	o = append(o, 0xa2, 0x73, 0x73)
@@ -166,13 +150,6 @@ func (z *PoolDecommissionInfo) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "ts"
 	o = append(o, 0xa2, 0x74, 0x73)
 	o = msgp.AppendInt64(o, z.TotalSize)
-	// string "du"
-	o = append(o, 0xa2, 0x64, 0x75)
-	o, err = z.Duration.MarshalMsg(o)
-	if err != nil {
-		err = msgp.WrapError(err, "Duration")
-		return
-	}
 	// string "cs"
 	o = append(o, 0xa2, 0x63, 0x73)
 	o = msgp.AppendInt64(o, z.CurrentSize)
@@ -221,12 +198,6 @@ func (z *PoolDecommissionInfo) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				err = msgp.WrapError(err, "TotalSize")
 				return
 			}
-		case "du":
-			bts, err = z.Duration.UnmarshalMsg(bts)
-			if err != nil {
-				err = msgp.WrapError(err, "Duration")
-				return
-			}
 		case "cs":
 			z.CurrentSize, bts, err = msgp.ReadInt64Bytes(bts)
 			if err != nil {
@@ -259,7 +230,7 @@ func (z *PoolDecommissionInfo) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *PoolDecommissionInfo) Msgsize() (s int) {
-	s = 1 + 3 + msgp.TimeSize + 3 + msgp.Int64Size + 3 + msgp.Int64Size + 3 + z.Duration.Msgsize() + 3 + msgp.Int64Size + 4 + msgp.BoolSize + 3 + msgp.BoolSize
+	s = 1 + 3 + msgp.TimeSize + 3 + msgp.Int64Size + 3 + msgp.Int64Size + 3 + msgp.Int64Size + 4 + msgp.BoolSize + 3 + msgp.BoolSize
 	return
 }
 
@@ -503,7 +474,7 @@ func (z *poolMeta) DecodeMsg(dc *msgp.Reader) (err error) {
 		}
 		switch msgp.UnsafeString(field) {
 		case "v":
-			z.Version, err = dc.ReadString()
+			z.Version, err = dc.ReadInt()
 			if err != nil {
 				err = msgp.WrapError(err, "Version")
 				return
@@ -546,7 +517,7 @@ func (z *poolMeta) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	err = en.WriteString(z.Version)
+	err = en.WriteInt(z.Version)
 	if err != nil {
 		err = msgp.WrapError(err, "Version")
 		return
@@ -577,7 +548,7 @@ func (z *poolMeta) MarshalMsg(b []byte) (o []byte, err error) {
 	// map header, size 2
 	// string "v"
 	o = append(o, 0x82, 0xa1, 0x76)
-	o = msgp.AppendString(o, z.Version)
+	o = msgp.AppendInt(o, z.Version)
 	// string "pls"
 	o = append(o, 0xa3, 0x70, 0x6c, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Pools)))
@@ -610,7 +581,7 @@ func (z *poolMeta) UnmarshalMsg(bts []byte) (o []byte, err error) {
 		}
 		switch msgp.UnsafeString(field) {
 		case "v":
-			z.Version, bts, err = msgp.ReadStringBytes(bts)
+			z.Version, bts, err = msgp.ReadIntBytes(bts)
 			if err != nil {
 				err = msgp.WrapError(err, "Version")
 				return
@@ -648,7 +619,7 @@ func (z *poolMeta) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *poolMeta) Msgsize() (s int) {
-	s = 1 + 2 + msgp.StringPrefixSize + len(z.Version) + 4 + msgp.ArrayHeaderSize
+	s = 1 + 2 + msgp.IntSize + 4 + msgp.ArrayHeaderSize
 	for za0001 := range z.Pools {
 		s += z.Pools[za0001].Msgsize()
 	}
