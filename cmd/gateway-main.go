@@ -168,6 +168,7 @@ func StartGateway(ctx *cli.Context, gw Gateway) {
 	}
 
 	// Validate if we have access, secret set through environment.
+	// TODO(yangchunxin): 注意处理S3 SSE相关判断
 	globalGatewayName = gw.Name()
 	gatewayName := gw.Name()
 	if ctx.Args().First() == "help" {
