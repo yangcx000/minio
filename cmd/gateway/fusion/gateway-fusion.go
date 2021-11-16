@@ -91,31 +91,28 @@ func fusionGatewayMain(ctx *cli.Context) {
 	// Start the gateway..
 	pools := []storagePool{
 		{
-			name:      "test",
-			endpoint:  "http://172.21.63.126:7480",
-			accessKey: "J6MO6M4OR3BLEMT8VYS2",
-			secretKey: "ZxBRluVsuNZboX0t39CEtcRac7fi48YNYIoymMFC",
+			id:       "test",
+			name:     "test-pool",
+			endpoint: "http://172.21.63.126:7480",
+			creds: poolCredentials{
+				accessKey: "J6MO6M4OR3BLEMT8VYS2",
+				secretKey: "ZxBRluVsuNZboX0t39CEtcRac7fi48YNYIoymMFC",
+			},
 		},
 		{
-			name:      "foo",
-			endpoint:  "http://172.21.63.127:7480",
-			accessKey: "0P3E1VRVLZ9FX2OKHM4L",
-			secretKey: "2tXW9s1FAOFCXjLMxnucQT0nplgMIJDzu6XWhvuc",
+			id:       "foo",
+			name:     "foo-pool",
+			endpoint: "http://172.21.63.127:7480",
+			creds: poolCredentials{
+				accessKey: "0P3E1VRVLZ9FX2OKHM4L",
+				secretKey: "2tXW9s1FAOFCXjLMxnucQT0nplgMIJDzu6XWhvuc",
+			},
 		},
 	}
 	minio.StartGateway(ctx, &Fusion{
 		pools: pools,
 		debug: true,
 	})
-}
-
-// object storage pool
-type storagePool struct {
-	name      string
-	status    string
-	endpoint  string
-	accessKey string
-	secretKey string
 }
 
 // Fusion implements Gateway.
@@ -289,14 +286,14 @@ func (g *Fusion) NewGatewayLayer(creds madmin.Credentials) (minio.ObjectLayer, e
 	for _, p := range g.pools {
 		// TODO(yangchunxin): filter abnormal status pool
 		c := madmin.Credentials{
-			AccessKey: p.accessKey,
-			SecretKey: p.secretKey,
+			AccessKey: p.creds.accessKey,
+			SecretKey: p.creds.secretKey,
 		}
 		clnt, err := g.new(p.endpoint, c, t)
 		if err != nil {
 			return nil, err
 		}
-		clients[p.name] = clnt
+		clients[p.id] = clnt
 	}
 
 	s := s3Objects{
@@ -325,6 +322,7 @@ func (g *Fusion) NewGatewayLayer(creds madmin.Credentials) (minio.ObjectLayer, e
 // s3Objects implements gateway for MinIO and S3 compatible object storage servers.
 type s3Objects struct {
 	minio.GatewayUnsupported
+	// pool_id --> client
 	Clients    map[string]*miniogo.Core
 	HTTPClient *http.Client
 	Metrics    *minio.BackendMetrics
