@@ -64,6 +64,10 @@ var ServerFlags = []cli.Flag{
 		Name:  "console-address",
 		Usage: "bind to a specific ADDRESS:PORT for embedded Console UI, ADDRESS can be an IP or hostname",
 	},
+	cli.StringFlag{
+		Name:  "mgs",
+		Usage: "fusionstore mgs address",
+	},
 }
 
 var serverCmd = cli.Command{

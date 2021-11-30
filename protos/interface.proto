@@ -1,0 +1,161 @@
+/*
+ * Copyright 2021 LiAuto authors.
+ * @yangchunxin
+ */
+
+syntax = "proto3";
+option go_package = "github.com/minio/minio/protos";
+package protos;
+
+import "status.proto";
+import "types.proto";
+
+message AddMdsRequest {
+    Mds mds = 1; 
+}
+
+message AddMdsResponse {
+    Status status = 1;
+    string id = 2;
+}
+
+message DeleteMdsRequest {
+    string id = 1;
+}
+
+message DeleteMdsResponse {
+    Status status = 1;
+}
+
+message UpdateMdsRequest {
+    Mds mds = 1; 
+}
+
+message UpdateMdsResponse {
+    Status status = 1;
+}
+
+message QueryMdsRequest {
+    string id = 1;
+}
+
+message QueryMdsResponse {
+    Status status = 1;
+    Mds mds = 2; 
+}
+
+message ListMdsRequest {
+    string prev = 1;
+    int32 limits = 2;
+}
+
+message ListMdsResponse {
+    Status status = 1;
+    string next = 2;
+    repeated Mds mds_list = 3;
+}
+
+/* pool operations */
+message AddPoolRequest {
+    Pool pool = 1;
+}
+
+message AddPoolResponse {
+    Status status = 1;
+    string id = 2;
+}
+
+message DeletePoolRequest {
+    string id = 1;
+}
+
+message DeletePoolResponse {
+    Status status = 1;
+}
+
+message UpdatePoolRequest {
+    Pool pool = 1;
+}
+
+message UpdatePoolResponse {
+    Status status = 1;
+}
+
+message QueryPoolRequest {
+    string id = 1;
+}
+
+message QueryPoolResponse {
+    Status status = 1;
+    Pool pool = 2;
+}
+
+message ListPoolRequest {
+    string prev = 1;
+    int32 limits = 2; 
+}
+
+message ListPoolResponse {
+    Status status = 1;
+    string next = 2;
+    repeated Pool pool_list = 3;
+}
+
+/* bucket operations */
+message AddBucketRequest {
+    Bucket bucket = 1;
+}
+
+message AddBucketResponse {
+    Status status = 1;
+    string id = 2;
+}
+
+message DeleteBucketRequest {
+    string id = 1;
+}
+
+message DeleteBucketResponse {
+    Status status = 1;
+}
+
+message QueryBucketRequest {
+    string id = 1;
+}
+
+message QueryBucketResponse {
+    Status status = 1;
+    Bucket bucket = 2;
+}
+
+message ListBucketRequest {
+    string prev = 1;
+    int32 limits = 2; 
+    string pool_id = 3;
+}
+
+message ListBucketResponse {
+    Status status = 1;
+    string next = 2;
+    repeated Bucket bucket_list = 3;
+}
+
+service MgsService {
+  // mds operations
+  rpc AddMds(AddMdsRequest) returns (AddMdsResponse) {}
+  rpc DeleteMds(DeleteMdsRequest) returns (DeleteMdsResponse) {}
+  rpc UpdateMds(UpdateMdsRequest) returns (UpdateMdsResponse) {}
+  rpc QueryMds(QueryMdsRequest) returns (QueryMdsResponse) {}
+  rpc ListMds(ListMdsRequest) returns (ListMdsResponse) {}
+  // pool operations
+  rpc AddPool(AddPoolRequest) returns (AddPoolResponse) {}
+  rpc DeletePool(DeletePoolRequest) returns (DeletePoolResponse) {}
+  rpc UpdatePool(UpdatePoolRequest) returns (UpdatePoolResponse) {}
+  rpc QueryPool(QueryPoolRequest) returns (QueryPoolResponse) {}
+  rpc ListPool(ListPoolRequest) returns (ListPoolResponse) {}
+  // bucket operations
+  rpc AddBucket(AddBucketRequest) returns (AddBucketResponse) {}
+  rpc DeleteBucket(DeleteBucketRequest) returns (DeleteBucketResponse) {}
+  rpc QueryBucket(QueryBucketRequest) returns (QueryBucketResponse) {}
+  rpc ListBucket(ListBucketRequest) returns (ListBucketResponse) {}
+}
