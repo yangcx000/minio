@@ -3,10 +3,12 @@
  * @yangchunxin
  */
 
-package fusion
+package mds
 
-// MDS metadata service
-type MDS struct {
+import "github.com/minio/minio/cmd/gateway/fusion/mgs"
+
+// Mds metadata service
+type Mds struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
 	Type        string   `json:"type"`
@@ -18,6 +20,20 @@ type MDS struct {
 	Pdservers   []string `json:"pdservers,omitempty"`
 	CreatedTime string   `json:"created_time"`
 	UpdatedTime string   `json:"updated_time"`
+}
+
+// Mgr xxx
+type Mgr struct {
+	mc     *mgs.Client
+	MdsMap map[string]*Mds
+}
+
+// NewMgr xxx
+func NewMgr(c *mgs.Client) (*Mgr, error) {
+	var err error
+	mgr := &Mgr{mc: c}
+	//mgr.MdsMap, err = mgr.mc.GetMdss()
+	return mgr, err
 }
 
 /*

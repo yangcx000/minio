@@ -39,6 +39,9 @@ import (
 	"github.com/minio/minio-go/v7/pkg/s3utils"
 	"github.com/minio/minio-go/v7/pkg/tags"
 	minio "github.com/minio/minio/cmd"
+	"github.com/minio/minio/cmd/gateway/fusion/mds"
+	"github.com/minio/minio/cmd/gateway/fusion/mgs"
+	"github.com/minio/minio/cmd/gateway/fusion/pool"
 	xhttp "github.com/minio/minio/internal/http"
 	"github.com/minio/minio/internal/logger"
 	"github.com/minio/pkg/bucket/policy"
@@ -94,7 +97,11 @@ func fusionGatewayMain(ctx *cli.Context) {
 	if len(mgsAddr) == 0 {
 		logger.FatalIf(errors.New("mgs addr empty"), "", nil)
 	}
-	pm, err := NewPoolMgr(mgsAddr)
+	err := mgs.NewClient(mgsAddr, 10)
+	if err != nil {
+		logger.FatalIf(err, "", nil)
+	}
+	pm, err := pool.NewMgr()
 	if err != nil {
 		logger.FatalIf(err, "", nil)
 	}
@@ -107,7 +114,8 @@ func fusionGatewayMain(ctx *cli.Context) {
 
 // Fusion implements Gateway.
 type Fusion struct {
-	PoolMgr *PoolMgr
+	PoolMgr *pool.Mgr
+	MdsMgr  *mds.Mgr
 	debug   bool
 }
 
