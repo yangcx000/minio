@@ -5,7 +5,12 @@
 
 package mds
 
-import "github.com/minio/minio/cmd/gateway/fusion/mgs"
+import (
+	"fmt"
+
+	"github.com/minio/minio/cmd/gateway/fusion/mgs"
+	"github.com/minio/minio/protos"
+)
 
 // Mds metadata service
 type Mds struct {
@@ -24,34 +29,47 @@ type Mds struct {
 
 // Mgr xxx
 type Mgr struct {
-	mc     *mgs.Client
 	MdsMap map[string]*Mds
 }
 
 // NewMgr xxx
-func NewMgr(c *mgs.Client) (*Mgr, error) {
-	var err error
-	mgr := &Mgr{mc: c}
-	//mgr.MdsMap, err = mgr.mc.GetMdss()
-	return mgr, err
+func NewMgr() (*Mgr, error) {
+	mgr := &Mgr{}
+	if err := mgr.Init(); err != nil {
+		return nil, err
+	}
+	return mgr, nil
 }
 
-/*
-// DecodeFromPb xxx
-func DecodeFromPb(p *protos.Mds) *MDS {
-	m := &MDS{
-		ID:          p.GetId(),
-		Name:        p.GetName(),
-		Type:        p.GetType(),
-		Status:      p.GetStatus(),
-		Region:      p.GetRegion(),
-		Used:        p.GetUsed(),
-		Capacity:    p.GetCapacity(),
-		Pdservers:   p.GetPdservers(),
-		Version:     p.GetVersion(),
-		CreatedTime: p.GetCreatedTime(),
-		UpdatedTime: p.GetUpdatedTime(),
+// Init xxx
+func (m *Mgr) Init() error {
+	resp, err := mgs.GlobalClient.ListMds()
+	if err != nil {
+		return err
 	}
-	return m
+	if resp.GetStatus().Code != protos.Code_OK {
+		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
+	}
+	m.MdsMap = make(map[string]*Mds)
+	for _, v := range resp.GetMdsList() {
+		p := &Mds{}
+		p.DecodeFromPb(v)
+		m.MdsMap[p.ID] = p
+	}
+	return nil
 }
-*/
+
+// DecodeFromPb xxx
+func (m *Mds) DecodeFromPb(p *protos.Mds) {
+	m.ID = p.GetId()
+	m.Name = p.GetName()
+	m.Type = p.GetType()
+	m.Status = p.GetStatus()
+	m.Region = p.GetRegion()
+	m.Used = p.GetUsed()
+	m.Capacity = p.GetCapacity()
+	m.Pdservers = p.GetPdservers()
+	m.Version = p.GetVersion()
+	m.CreatedTime = p.GetCreatedTime()
+	m.UpdatedTime = p.GetUpdatedTime()
+}

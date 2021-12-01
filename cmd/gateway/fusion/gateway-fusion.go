@@ -105,9 +105,14 @@ func fusionGatewayMain(ctx *cli.Context) {
 	if err != nil {
 		logger.FatalIf(err, "", nil)
 	}
+	mm, err := mds.NewMgr()
+	if err != nil {
+		logger.FatalIf(err, "", nil)
+	}
 	// Start the gateway..
 	minio.StartGateway(ctx, &Fusion{
 		PoolMgr: pm,
+		MdsMgr:  mm,
 		debug:   true,
 	})
 }

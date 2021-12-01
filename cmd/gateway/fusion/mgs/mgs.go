@@ -57,22 +57,10 @@ func (c *Client) ListBuckets(poolID string) (*protos.ListBucketResponse, error) 
 	return c.svc.ListBucket(ctx, req)
 }
 
-/*
-// GetMdss xxx
-func (c *Client) GetMdss() (map[string]*mds.Mds, error) {
-	mdss := make(map[string]*mds.Mds)
+// ListMds xxx
+func (c *Client) ListMds() (*protos.ListMdsResponse, error) {
 	req := &protos.ListMdsRequest{}
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
-	if resp, err := c.svc.ListMds(ctx, req); err == nil {
-		if resp.GetStatus().Code != protos.Code_OK {
-			return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
-		}
-		for _, v := range resp.GetMdsList() {
-			m := mds.DecodeFromPb(v)
-			mdss[m.ID] = m
-		}
-	}
-	return mdss, nil
+	return c.svc.ListMds(ctx, req)
 }
-*/
