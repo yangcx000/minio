@@ -4,7 +4,7 @@
  */
 
 syntax = "proto3";
-option go_package = "github.com/minio/minio/protos";
+option go_package = "lixiang.com/rpc/protos";
 package protos;
 
 enum Code {

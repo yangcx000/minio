@@ -4,8 +4,10 @@
  */
 
 syntax = "proto3";
-option go_package = "github.com/minio/minio/protos";
+option go_package = "lixiang.com/rpc/protos";
 package protos;
+
+import "google/protobuf/timestamp.proto";
 
 // metadata service
 message Mds{
@@ -51,4 +53,16 @@ message Bucket {
   int32 version = 5;
   string created_time = 6;
   string updated_time = 7;
+}
+
+// vbucket
+message VBucket {
+  string id = 1;
+  string name = 2;
+  string status = 3;
+  string owner = 4;
+  string pool_id = 5;
+  int32 version = 6;
+  google.protobuf.Timestamp created_time = 7;
+  google.protobuf.Timestamp updated_time = 8;
 }

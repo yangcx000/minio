@@ -4,7 +4,7 @@
  */
 
 syntax = "proto3";
-option go_package = "github.com/minio/minio/protos";
+option go_package = "lixiang.com/rpc/protos";
 package protos;
 
 import "status.proto";
@@ -140,6 +140,43 @@ message ListBucketResponse {
     repeated Bucket bucket_list = 3;
 }
 
+/* vbucket operations */
+message CreateVBucketRequest {
+    VBucket vbucket = 1;
+}
+
+message CreateVBucketResponse {
+    Status status = 1;
+}
+
+message DeleteVBucketRequest {
+    string name = 1; 
+}
+
+message DeleteVBucketResponse {
+    Status status = 1;
+}
+
+message QueryVBucketRequest{
+    string name = 1; 
+}
+
+message QueryVBucketResponse{
+    Status status = 1;
+    VBucket vbucket = 2;
+}
+
+message ListVBucketRequest {
+    string prev = 1;
+    int32 limits = 2; 
+}
+
+message ListVBucketResponse{
+    Status status = 1;
+    string next = 2;
+    repeated VBucket vbuckets = 3;
+}
+
 service MgsService {
   // mds operations
   rpc AddMds(AddMdsRequest) returns (AddMdsResponse) {}
@@ -158,4 +195,9 @@ service MgsService {
   rpc DeleteBucket(DeleteBucketRequest) returns (DeleteBucketResponse) {}
   rpc QueryBucket(QueryBucketRequest) returns (QueryBucketResponse) {}
   rpc ListBucket(ListBucketRequest) returns (ListBucketResponse) {}
+  // vbucket operations
+  rpc CreateVBucket(CreateVBucketRequest) returns (CreateVBucketResponse) {}
+  rpc DeleteVBucket(DeleteVBucketRequest) returns (DeleteVBucketResponse) {}
+  rpc QueryVBucket(QueryVBucketRequest) returns (QueryVBucketResponse) {}
+  rpc ListVBucket(ListVBucketRequest) returns (ListVBucketResponse) {}
 }
