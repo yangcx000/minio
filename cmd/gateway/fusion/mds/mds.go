@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/minio/minio/cmd/gateway/fusion/mgs"
+	"github.com/minio/minio/internal/kv"
 	"github.com/minio/minio/protos"
 )
 
@@ -29,7 +30,8 @@ type Mds struct {
 
 // Mgr xxx
 type Mgr struct {
-	MdsMap map[string]*Mds
+	MdsMap    map[string]*Mds
+	MdsStores map[string]kv.Store
 }
 
 // NewMgr xxx
@@ -51,9 +53,15 @@ func (m *Mgr) Init() error {
 		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
 	m.MdsMap = make(map[string]*Mds)
+	m.MdsStores = make(map[string]kv.Store)
 	for _, v := range resp.GetMdsList() {
 		p := &Mds{}
 		p.DecodeFromPb(v)
+		// open
+		m.MdsStores[p.ID] = kv.NewTiKV(p.Pdservers)
+		if err := m.MdsStores[p.ID].Open(); err != nil {
+			return err
+		}
 		m.MdsMap[p.ID] = p
 	}
 	return nil
