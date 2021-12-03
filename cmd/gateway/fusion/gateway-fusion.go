@@ -286,7 +286,7 @@ func (g *Fusion) NewGatewayLayer(creds madmin.Credentials) (minio.ObjectLayer, e
 	// all credentials.
 	_ = creds
 	clients := make(map[string]*miniogo.Core)
-	for k, v := range g.PoolMgr.Pools {
+	for k, v := range g.PoolMgr.PoolMap {
 		cred := madmin.Credentials{
 			AccessKey: v.Creds.AccessKey,
 			SecretKey: v.Creds.SecretKey,

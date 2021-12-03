@@ -90,7 +90,7 @@ func (p *Pool) Init() error {
 
 // Mgr xxx
 type Mgr struct {
-	Pools map[string]*Pool
+	PoolMap map[string]*Pool
 }
 
 // NewMgr xxx
@@ -111,14 +111,14 @@ func (m *Mgr) Init() error {
 	if resp.GetStatus().Code != protos.Code_OK {
 		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
-	m.Pools = make(map[string]*Pool)
+	m.PoolMap = make(map[string]*Pool)
 	for _, v := range resp.GetPoolList() {
 		p := &Pool{}
 		p.DecodeFromPb(v)
 		if err = p.Init(); err != nil {
 			return err
 		}
-		m.Pools[p.ID] = p
+		m.PoolMap[p.ID] = p
 	}
 	return nil
 }
@@ -127,7 +127,7 @@ func (m *Mgr) Init() error {
 func (m *Mgr) GetPoolByBucket(bucketName string) string {
 	// FIXME: design pool select algorithm
 	ids := []string{}
-	for k := range m.Pools {
+	for k := range m.PoolMap {
 		ids = append(ids, k)
 	}
 	return ids[0]
