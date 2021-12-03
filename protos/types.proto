@@ -66,3 +66,25 @@ message VBucket {
   google.protobuf.Timestamp created_time = 7;
   google.protobuf.Timestamp updated_time = 8;
 }
+
+// object
+message Object {
+  string bucket = 1;
+  string name = 2;
+  string etag = 3;
+  string inner_etag = 4;
+  string version_id = 5;
+  string content_type = 6;
+  string content_encoding = 7;
+  string storage_class = 8; 
+  string user_tags = 9;
+  int64 size = 10;
+  bool is_dir = 11;
+  bool is_latest = 12;
+  bool delete_marker = 13; 
+  bool restore_ongoing = 14;
+  google.protobuf.Timestamp mod_time = 15;
+  google.protobuf.Timestamp acc_time = 16;
+  google.protobuf.Timestamp expires = 17;
+  google.protobuf.Timestamp restore_expires = 18;
+}

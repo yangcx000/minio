@@ -1,0 +1,58 @@
+/*
+ * Copyright 2021 LiAuto authors.
+ * @yangchunxin
+ */
+
+syntax = "proto3";
+option go_package = "lixiang.com/rpc/protos";
+package protos;
+
+import "status.proto";
+import "types.proto";
+
+message AddObjectRequest {
+    Object object = 1; 
+}
+
+message AddObjectResponse {
+    Status status = 1;
+}
+
+message DeleteObjectRequest {
+    string bucket = 1;
+    string name = 2;
+}
+
+message DeleteObjectResponse {
+    Status status = 1;
+}
+
+message QueryObjectRequest {
+    string bucket = 1;
+    string name = 2;
+}
+
+message QueryObjectResponse {
+    Status status = 1;
+    Object object = 2; 
+}
+
+message ListObjectRequest {
+    string bucket = 1;
+    string prev = 2;
+    int32 limits = 3;
+}
+
+message ListObjectResponse {
+    Status status = 1;
+    string next = 2;
+    repeated Object objects = 3;
+}
+
+service MdsService {
+  // object operations
+  rpc AddObject(AddObjectRequest) returns (AddObjectResponse) {}
+  rpc DeleteObject(DeleteObjectRequest) returns (DeleteObjectResponse) {}
+  rpc QueryObject(QueryObjectRequest) returns (QueryObjectResponse) {}
+  rpc ListObject(ListObjectRequest) returns (ListObjectResponse) {}
+}
