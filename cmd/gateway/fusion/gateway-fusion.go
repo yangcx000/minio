@@ -97,7 +97,7 @@ func fusionGatewayMain(ctx *cli.Context) {
 	if len(mgsAddr) == 0 {
 		logger.FatalIf(errors.New("mgs addr empty"), "", nil)
 	}
-	err := mgs.NewClient(mgsAddr, 10)
+	err := mgs.NewService(mgsAddr, 10)
 	if err != nil {
 		logger.FatalIf(err, "", nil)
 	}

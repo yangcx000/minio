@@ -44,7 +44,7 @@ func NewMgr() (*Mgr, error) {
 
 // Init xxx
 func (m *Mgr) Init() error {
-	resp, err := mgs.GlobalClient.ListMds()
+	resp, err := mgs.GlobalService.ListMds()
 	if err != nil {
 		return err
 	}

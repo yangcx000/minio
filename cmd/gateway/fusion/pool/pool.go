@@ -72,7 +72,7 @@ func (p *Pool) DecodeFromPb(pool *protos.Pool) {
 
 // Init xxx
 func (p *Pool) Init() error {
-	resp, err := mgs.GlobalClient.ListBuckets(p.ID)
+	resp, err := mgs.GlobalService.ListBuckets(p.ID)
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func NewMgr() (*Mgr, error) {
 
 // Init xxx
 func (m *Mgr) Init() error {
-	resp, err := mgs.GlobalClient.ListPools()
+	resp, err := mgs.GlobalService.ListPools()
 	if err != nil {
 		return err
 	}
