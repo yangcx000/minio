@@ -102,16 +102,16 @@ func (s *Store) setupClients(transport http.RoundTripper) error {
 			AccessKey: v.Creds.AccessKey,
 			SecretKey: v.Creds.SecretKey,
 		}
-		clnt, err := s.makeConns("http://"+v.Endpoint, cred, transport)
+		core, err := s.newCore("http://"+v.Endpoint, cred, transport)
 		if err != nil {
 			return err
 		}
-		s.Pools[k] = clnt
+		s.Pools[k] = core
 	}
 	return nil
 }
 
-func (s *Store) makeConns(endpoint string, creds madmin.Credentials, transport http.RoundTripper) (*miniogo.Core, error) {
+func (s *Store) newCore(endpoint string, creds madmin.Credentials, transport http.RoundTripper) (*miniogo.Core, error) {
 	if len(endpoint) == 0 {
 		return nil, errors.New("endpoint empty")
 	}
