@@ -195,6 +195,9 @@ func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string, opts 
 func (s *Store) GetBucketInfo(ctx context.Context, bucket string) (bi minio.BucketInfo, e error) {
 	vb, err := s.VBucketMgr.GetBucketInfo(bucket)
 	if err != nil {
+		return bi, minio.ErrorRespToObjectError(err)
+	}
+	if vb == nil {
 		return bi, minio.BucketNotFound{Bucket: bucket}
 	}
 	return minio.BucketInfo{

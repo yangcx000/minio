@@ -87,7 +87,7 @@ func (m *Mgr) MakeBucket(bucket, location string) error {
 		return fmt.Errorf("bucket %q exists", bucket)
 	}
 	// TODO(yangchunxin): select pool and mds
-	pool, mds := "xxx", "yyy"
+	pool, mds := "pool-yglkr", "mds-nilcc"
 	resp, err := mgs.GlobalService.CreateVBucket(bucket, location, pool, mds)
 	if err != nil {
 		return err
