@@ -45,22 +45,21 @@ func (v *VBucket) DecodeFromPb(p *protos.VBucket) {
 
 // Mgr xxx
 type Mgr struct {
-	VBucketMap map[string]*VBucket
-	PoolMgr    *pool.Mgr
-	MdsMgr     *mds.Mgr
+	PoolMgr  *pool.Mgr
+	MdsMgr   *mds.Mgr
+	VBuckets map[string]*VBucket
 }
 
 // NewMgr xxx
 func NewMgr() (*Mgr, error) {
 	mgr := &Mgr{}
-	if err := mgr.Init(); err != nil {
+	if err := mgr.init(); err != nil {
 		return nil, err
 	}
 	return mgr, nil
 }
 
-// Init xxx
-func (m *Mgr) Init() error {
+func (m *Mgr) init() error {
 	var err error
 	if m.PoolMgr, err = pool.NewMgr(); err != nil {
 		return err
@@ -68,27 +67,27 @@ func (m *Mgr) Init() error {
 	if m.MdsMgr, err = mds.NewMgr(); err != nil {
 		return err
 	}
-	resp, err := mgs.GlobalService.ListVBuckets()
+	vbs, err := m.ListBuckets()
 	if err != nil {
 		return err
 	}
-	if resp.GetStatus().Code != protos.Code_OK {
-		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
-	}
-	m.VBucketMap = make(map[string]*VBucket)
-	for _, v := range resp.GetVbuckets() {
-		p := &VBucket{}
-		p.DecodeFromPb(v)
-		m.VBucketMap[p.Name] = p
+	m.VBuckets = make(map[string]*VBucket)
+	for _, v := range vbs {
+		m.VBuckets[v.Name] = v
 	}
 	return nil
 }
 
 // MakeBucket xxx
 func (m *Mgr) MakeBucket(bucket, location string) error {
+	vb, err := m.GetBucketInfo(bucket)
+	if err != nil {
+		return err
+	} else if vb != nil {
+		return fmt.Errorf("bucket %q exists", bucket)
+	}
 	// TODO(yangchunxin): select pool and mds
-	pool := "xxx"
-	mds := "xxx"
+	pool, mds := "xxx", "yyy"
 	resp, err := mgs.GlobalService.CreateVBucket(bucket, location, pool, mds)
 	if err != nil {
 		return err
@@ -96,7 +95,8 @@ func (m *Mgr) MakeBucket(bucket, location string) error {
 	if resp.GetStatus().Code != protos.Code_OK {
 		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
-	m.VBucketMap[bucket] = &VBucket{
+	// TODO(yangchunxin): refactor it
+	m.VBuckets[bucket] = &VBucket{
 		Name:     bucket,
 		Pool:     pool,
 		Mds:      mds,
@@ -114,6 +114,7 @@ func (m *Mgr) DeleteBucket(bucket string) error {
 	if resp.GetStatus().Code != protos.Code_OK {
 		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
+	delete(m.VBuckets, bucket)
 	return nil
 }
 
@@ -124,6 +125,9 @@ func (m *Mgr) GetBucketInfo(bucket string) (*VBucket, error) {
 		return nil, err
 	}
 	if resp.GetStatus().Code != protos.Code_OK {
+		if resp.GetStatus().Code == protos.Code_NOT_FOUND {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
 	vb := &VBucket{}

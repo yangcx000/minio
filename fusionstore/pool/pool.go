@@ -71,64 +71,90 @@ func (p *Pool) DecodeFromPb(pool *protos.Pool) {
 }
 
 // Init xxx
-func (p *Pool) Init() error {
-	resp, err := mgs.GlobalService.ListBuckets(p.ID)
+func (p *Pool) init() error {
+	buckets, err := p.ListBuckets()
 	if err != nil {
 		return err
 	}
-	if resp.GetStatus().Code != protos.Code_OK {
-		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
-	}
 	p.Buckets = make(map[string]*Bucket)
-	for _, v := range resp.GetBucketList() {
-		b := &Bucket{}
-		b.DecodeFromPb(v)
+	for _, b := range buckets {
 		p.Buckets[b.ID] = b
 	}
 	return nil
 }
 
+// ListBuckets xxx
+func (p *Pool) ListBuckets() ([]*Bucket, error) {
+	resp, err := mgs.GlobalService.ListBuckets(p.ID)
+	if err != nil {
+		return nil, err
+	}
+	if resp.GetStatus().Code != protos.Code_OK {
+		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
+	}
+	buckets := make([]*Bucket, len(resp.GetBucketList()))
+	for i, v := range resp.GetBucketList() {
+		b := &Bucket{}
+		b.DecodeFromPb(v)
+		buckets[i] = b
+	}
+	return buckets, nil
+}
+
 // Mgr xxx
 type Mgr struct {
-	PoolMap map[string]*Pool
+	Pools map[string]*Pool
 }
 
 // NewMgr xxx
 func NewMgr() (*Mgr, error) {
 	mgr := &Mgr{}
-	if err := mgr.Init(); err != nil {
+	if err := mgr.init(); err != nil {
 		return nil, err
 	}
 	return mgr, nil
 }
 
 // Init xxx
-func (m *Mgr) Init() error {
-	resp, err := mgs.GlobalService.ListPools()
+func (m *Mgr) init() error {
+	pools, err := m.ListPools()
 	if err != nil {
 		return err
 	}
-	if resp.GetStatus().Code != protos.Code_OK {
-		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
-	}
-	m.PoolMap = make(map[string]*Pool)
-	for _, v := range resp.GetPoolList() {
-		p := &Pool{}
-		p.DecodeFromPb(v)
-		if err = p.Init(); err != nil {
-			return err
-		}
-		m.PoolMap[p.ID] = p
+	m.Pools = make(map[string]*Pool, len(pools))
+	for _, v := range pools {
+		m.Pools[v.ID] = v
 	}
 	return nil
 }
 
-// GetPoolByBucket xxx
-func (m *Mgr) GetPoolByBucket(bucketName string) string {
-	// FIXME: design pool select algorithm
-	ids := []string{}
-	for k := range m.PoolMap {
-		ids = append(ids, k)
+// ListPools xxx
+func (m *Mgr) ListPools() ([]*Pool, error) {
+	resp, err := mgs.GlobalService.ListPools()
+	if err != nil {
+		return nil, err
 	}
-	return ids[0]
+	if resp.GetStatus().Code != protos.Code_OK {
+		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
+	}
+	pools := make([]*Pool, len(resp.GetPoolList()))
+	for i, v := range resp.GetPoolList() {
+		p := &Pool{}
+		p.DecodeFromPb(v)
+		if err = p.init(); err != nil {
+			return nil, err
+		}
+		pools[i] = p
+	}
+	return pools, nil
 }
+
+// GetPoolByBucket xxx
+//func (m *Mgr) GetPoolByBucket(bucketName string) string {
+//	// FIXME: design pool select algorithm
+//	ids := []string{}
+//	for k := range m.PoolMap {
+//		ids = append(ids, k)
+//	}
+//	return ids[0]
+//}

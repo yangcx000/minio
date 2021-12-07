@@ -53,11 +53,10 @@ func randString(n int, src rand.Source, prefix string) string {
 // Store xxx
 type Store struct {
 	minio.GatewayUnsupported
-	// poolID --> client
-	Clients    map[string]*miniogo.Core
+	Pools      map[string]*miniogo.Core
+	VBucketMgr *vbucket.Mgr
 	HTTPClient *http.Client
 	Metrics    *minio.BackendMetrics
-	VBucketMgr *vbucket.Mgr
 	debug      bool
 }
 
@@ -76,6 +75,7 @@ func New(mgsAddr string) (*Store, error) {
 		HTTPClient: &http.Client{
 			Transport: t,
 		},
+		debug: true,
 	}
 	err := s.init(mgsAddr, t)
 	return s, err
@@ -96,8 +96,8 @@ func (s *Store) init(mgsAddr string, transport http.RoundTripper) error {
 }
 
 func (s *Store) setupClients(transport http.RoundTripper) error {
-	s.Clients = make(map[string]*miniogo.Core)
-	for k, v := range s.VBucketMgr.PoolMgr.PoolMap {
+	s.Pools = make(map[string]*miniogo.Core)
+	for k, v := range s.VBucketMgr.PoolMgr.Pools {
 		cred := madmin.Credentials{
 			AccessKey: v.Creds.AccessKey,
 			SecretKey: v.Creds.SecretKey,
@@ -106,7 +106,7 @@ func (s *Store) setupClients(transport http.RoundTripper) error {
 		if err != nil {
 			return err
 		}
-		s.Clients[k] = clnt
+		s.Pools[k] = clnt
 	}
 	return nil
 }
@@ -161,12 +161,6 @@ func (s *Store) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-// GetPool xxx
-//func (s *Store) GetPool(bucketName string) string {
-//	return ""
-//	//return l.Fusion.PoolMgr.GetPoolByBucket(bucketName)
-//}
-
 // StorageInfo is not relevant to S3 backend.
 func (s *Store) StorageInfo(ctx context.Context) (si minio.StorageInfo, _ []error) {
 	// TODO(yangchunxin): add later
@@ -209,7 +203,7 @@ func (s *Store) GetBucketInfo(ctx context.Context, bucket string) (bi minio.Buck
 	}, nil
 }
 
-// ListBuckets lists all S3 buckets
+// ListBuckets lists all buckets
 func (s *Store) ListBuckets(ctx context.Context) ([]minio.BucketInfo, error) {
 	vbs, err := s.VBucketMgr.ListBuckets()
 	if err != nil {
@@ -225,7 +219,7 @@ func (s *Store) ListBuckets(ctx context.Context) ([]minio.BucketInfo, error) {
 	return b, err
 }
 
-// DeleteBucket deletes a bucket on S3
+// DeleteBucket deletes a bucket
 func (s *Store) DeleteBucket(ctx context.Context, bucket string, opts minio.DeleteBucketOptions) error {
 	err := s.VBucketMgr.DeleteBucket(bucket)
 	if err != nil {

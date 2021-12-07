@@ -27,45 +27,6 @@ type Mds struct {
 	UpdatedTime string   `json:"updated_time"`
 }
 
-// Mgr xxx
-type Mgr struct {
-	MdsMap      map[string]*Mds
-	MdsServices map[string]*Service
-}
-
-// NewMgr xxx
-func NewMgr() (*Mgr, error) {
-	mgr := &Mgr{}
-	if err := mgr.Init(); err != nil {
-		return nil, err
-	}
-	return mgr, nil
-}
-
-// Init xxx
-func (m *Mgr) Init() error {
-	resp, err := mgs.GlobalService.ListMds()
-	if err != nil {
-		return err
-	}
-	if resp.GetStatus().Code != protos.Code_OK {
-		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
-	}
-	m.MdsMap = make(map[string]*Mds)
-	m.MdsServices = make(map[string]*Service)
-	for _, v := range resp.GetMdsList() {
-		p := &Mds{}
-		p.DecodeFromPb(v)
-		svc, err := NewService(p.Pdservers[0], 10)
-		if err != nil {
-			return err
-		}
-		m.MdsServices[p.ID] = svc
-		m.MdsMap[p.ID] = p
-	}
-	return nil
-}
-
 // DecodeFromPb xxx
 func (m *Mds) DecodeFromPb(p *protos.Mds) {
 	m.ID = p.GetId()
@@ -79,4 +40,57 @@ func (m *Mds) DecodeFromPb(p *protos.Mds) {
 	m.Version = p.GetVersion()
 	m.CreatedTime = p.GetCreatedTime()
 	m.UpdatedTime = p.GetUpdatedTime()
+}
+
+// Mgr xxx
+type Mgr struct {
+	MdsMap      map[string]*Mds
+	MdsServices map[string]*Service
+}
+
+// NewMgr xxx
+func NewMgr() (*Mgr, error) {
+	mgr := &Mgr{}
+	if err := mgr.init(); err != nil {
+		return nil, err
+	}
+	return mgr, nil
+}
+
+// Init xxx
+func (m *Mgr) init() error {
+	mdsList, err := m.ListMds()
+	if err != nil {
+		return err
+	}
+	m.MdsMap = make(map[string]*Mds, len(mdsList))
+	m.MdsServices = make(map[string]*Service, len(mdsList))
+	for _, v := range mdsList {
+		// TODO(yangchunxin): fix it
+		svc, err := NewService(v.Pdservers[0], 10)
+		if err != nil {
+			return err
+		}
+		m.MdsServices[v.ID] = svc
+		m.MdsMap[v.ID] = v
+	}
+	return nil
+}
+
+// ListMds xxx
+func (m *Mgr) ListMds() ([]*Mds, error) {
+	resp, err := mgs.GlobalService.ListMds()
+	if err != nil {
+		return nil, err
+	}
+	if resp.GetStatus().Code != protos.Code_OK {
+		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
+	}
+	mdsList := make([]*Mds, len(resp.GetMdsList()))
+	for i, v := range resp.GetMdsList() {
+		p := &Mds{}
+		p.DecodeFromPb(v)
+		mdsList[i] = p
+	}
+	return mdsList, nil
 }
