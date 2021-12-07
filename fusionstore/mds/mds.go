@@ -8,7 +8,7 @@ package mds
 import (
 	"fmt"
 
-	"github.com/minio/minio/cmd/gateway/fusion/mgs"
+	"github.com/minio/minio/fusionstore/mgs"
 	"github.com/minio/minio/protos"
 )
 
@@ -56,7 +56,6 @@ func (m *Mgr) Init() error {
 	for _, v := range resp.GetMdsList() {
 		p := &Mds{}
 		p.DecodeFromPb(v)
-		// open
 		svc, err := NewService(p.Pdservers[0], 10)
 		if err != nil {
 			return err

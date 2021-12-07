@@ -8,7 +8,7 @@ package pool
 import (
 	"fmt"
 
-	"github.com/minio/minio/cmd/gateway/fusion/mgs"
+	"github.com/minio/minio/fusionstore/mgs"
 	"github.com/minio/minio/protos"
 )
 

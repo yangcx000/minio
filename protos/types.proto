@@ -61,10 +61,12 @@ message VBucket {
   string name = 2;
   string status = 3;
   string owner = 4;
-  string pool_id = 5;
-  int32 version = 6;
-  google.protobuf.Timestamp created_time = 7;
-  google.protobuf.Timestamp updated_time = 8;
+  string pool = 5;
+  string mds = 6;
+  string location = 7;
+  int32 version = 8;
+  google.protobuf.Timestamp created_time = 9;
+  google.protobuf.Timestamp updated_time = 10;
 }
 
 // object
