@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	minio "github.com/minio/minio/cmd"
 	"github.com/minio/minio/fusionstore/mds"
 	"github.com/minio/minio/fusionstore/mgs"
 	"github.com/minio/minio/fusionstore/pool"
@@ -151,4 +152,19 @@ func (m *Mgr) ListBuckets() ([]*VBucket, error) {
 		vbs[i] = vb
 	}
 	return vbs, nil
+}
+
+// AllocPoolAndBucket xxx
+func (m *Mgr) AllocPoolAndBucket(vbucket, object string) (string, string) {
+	// TODO(yangchunxin):
+	// 1. select pool
+
+	// 2. select bucket
+	poolID, bucket := "", ""
+	return poolID, bucket
+}
+
+// PutObjectMeta xxx
+func (m *Mgr) PutObjectMeta(pID, pBucket string, objInfo minio.ObjectInfo) error {
+	return nil
 }

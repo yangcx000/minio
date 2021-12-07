@@ -18,6 +18,7 @@ import (
 	minio "github.com/minio/minio/cmd"
 	"github.com/minio/minio/fusionstore/mgs"
 	"github.com/minio/minio/fusionstore/vbucket"
+	xhttp "github.com/minio/minio/internal/http"
 	"github.com/minio/pkg/bucket/policy"
 )
 
@@ -344,42 +345,45 @@ func (s *Store) GetObjectInfo(ctx context.Context, bucket string, object string,
 
 // PutObject creates a new object with the incoming data,
 func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *minio.PutObjReader, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	/*
-		data := r.Reader
-		var tagMap map[string]string
-		if tagstr, ok := opts.UserDefined[xhttp.AmzObjectTagging]; ok && tagstr != "" {
-			tagObj, err := tags.ParseObjectTags(tagstr)
-			if err != nil {
-				return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
-			}
-			tagMap = tagObj.ToMap()
-			delete(opts.UserDefined, xhttp.AmzObjectTagging)
-		}
-		putOpts := miniogo.PutObjectOptions{
-			UserMetadata:         opts.UserDefined,
-			ServerSideEncryption: opts.ServerSideEncryption,
-			UserTags:             tagMap,
-			// Content-Md5 is needed for buckets with object locking,
-			// instead of spending an extra API call to detect this
-			// we can set md5sum to be calculated always.
-			SendContentMd5: true,
-		}
-		poolID := l.GetPool(bucket)
-		ui, err := l.Clients[poolID].PutObject(ctx, bucket, object, data, data.Size(), data.MD5Base64String(), data.SHA256HexString(), putOpts)
+	data := r.Reader
+	var tagMap map[string]string
+	if tagstr, ok := opts.UserDefined[xhttp.AmzObjectTagging]; ok && tagstr != "" {
+		tagObj, err := tags.ParseObjectTags(tagstr)
 		if err != nil {
 			return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
 		}
-		// On success, populate the key & metadata so they are present in the notification
-		oi := miniogo.ObjectInfo{
-			ETag:     ui.ETag,
-			Size:     ui.Size,
-			Key:      object,
-			Metadata: minio.ToMinioClientObjectInfoMetadata(opts.UserDefined),
-		}
-
-		return minio.FromMinioClientObjectInfo(bucket, oi), nil
-	*/
-	return minio.ObjectInfo{}, nil
+		tagMap = tagObj.ToMap()
+		delete(opts.UserDefined, xhttp.AmzObjectTagging)
+	}
+	putOpts := miniogo.PutObjectOptions{
+		UserMetadata:         opts.UserDefined,
+		ServerSideEncryption: opts.ServerSideEncryption,
+		UserTags:             tagMap,
+		// Content-Md5 is needed for buckets with object locking,
+		// instead of spending an extra API call to detect this
+		// we can set md5sum to be calculated always.
+		SendContentMd5: true,
+	}
+	// get pool id and bucket name
+	pID, pBucket := s.VBucketMgr.AllocPoolAndBucket(bucket, object)
+	ui, err := s.Pools[pID].PutObject(ctx, pBucket, object, data, data.Size(), data.MD5Base64String(), data.SHA256HexString(), putOpts)
+	if err != nil {
+		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	// On success, populate the key & metadata so they are present in the notification
+	oi := miniogo.ObjectInfo{
+		ETag:     ui.ETag,
+		Size:     ui.Size,
+		Key:      object,
+		Metadata: minio.ToMinioClientObjectInfoMetadata(opts.UserDefined),
+	}
+	objInfo = minio.FromMinioClientObjectInfo(bucket, oi)
+	// insert object meta
+	err = s.VBucketMgr.PutObjectMeta(pID, pBucket, objInfo)
+	if err != nil {
+		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	return objInfo, nil
 }
 
 // CopyObject copies an object from source bucket to a destination bucket.
