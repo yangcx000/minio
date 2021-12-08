@@ -9,6 +9,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/minio/minio/fusionstore/object"
 	"github.com/minio/minio/protos"
 	"google.golang.org/grpc"
 )
@@ -37,10 +38,40 @@ func (s *Service) Close() {
 	s.conn.Close()
 }
 
-// AddObject xxx
-func (s *Service) AddObject() (*protos.AddObjectResponse, error) {
-	req := &protos.AddObjectRequest{}
+// PutObject xxx
+func (s *Service) PutObject(obj *object.Object) (*protos.PutObjectResponse, error) {
+	req := &protos.PutObjectRequest{Object: obj.EncodeToPb()}
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
-	return s.svc.AddObject(ctx, req)
+	return s.svc.PutObject(ctx, req)
+}
+
+// DeleteObject xxx
+func (s *Service) DeleteObject(vbucket, object string) (*protos.DeleteObjectResponse, error) {
+	req := &protos.DeleteObjectRequest{
+		Vbucket: vbucket,
+		Object:  object,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+	defer cancel()
+	return s.svc.DeleteObject(ctx, req)
+}
+
+// QueryObject xxx
+func (s *Service) QueryObject(vbucket, object string) (*protos.QueryObjectResponse, error) {
+	req := &protos.QueryObjectRequest{
+		Vbucket: vbucket,
+		Object:  object,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+	defer cancel()
+	return s.svc.QueryObject(ctx, req)
+}
+
+// ListObjects xxx
+func (s *Service) ListObjects(vbucket string) (*protos.ListObjectsResponse, error) {
+	req := &protos.ListObjectsRequest{Vbucket: vbucket}
+	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+	defer cancel()
+	return s.svc.ListObjects(ctx, req)
 }

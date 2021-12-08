@@ -10,17 +10,17 @@ package protos;
 import "status.proto";
 import "types.proto";
 
-message AddObjectRequest {
+message PutObjectRequest {
     Object object = 1; 
 }
 
-message AddObjectResponse {
+message PutObjectResponse {
     Status status = 1;
 }
 
 message DeleteObjectRequest {
-    string bucket = 1;
-    string name = 2;
+    string vbucket = 1;
+    string object = 2;
 }
 
 message DeleteObjectResponse {
@@ -28,8 +28,8 @@ message DeleteObjectResponse {
 }
 
 message QueryObjectRequest {
-    string bucket = 1;
-    string name = 2;
+    string vbucket = 1;
+    string object = 2;
 }
 
 message QueryObjectResponse {
@@ -37,13 +37,13 @@ message QueryObjectResponse {
     Object object = 2; 
 }
 
-message ListObjectRequest {
-    string bucket = 1;
+message ListObjectsRequest {
+    string vbucket = 1;
     string prev = 2;
     int32 limits = 3;
 }
 
-message ListObjectResponse {
+message ListObjectsResponse {
     Status status = 1;
     string next = 2;
     repeated Object objects = 3;
@@ -51,8 +51,8 @@ message ListObjectResponse {
 
 service MdsService {
   // object operations
-  rpc AddObject(AddObjectRequest) returns (AddObjectResponse) {}
+  rpc PutObject(PutObjectRequest) returns (PutObjectResponse) {}
   rpc DeleteObject(DeleteObjectRequest) returns (DeleteObjectResponse) {}
   rpc QueryObject(QueryObjectRequest) returns (QueryObjectResponse) {}
-  rpc ListObject(ListObjectRequest) returns (ListObjectResponse) {}
+  rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse) {}
 }

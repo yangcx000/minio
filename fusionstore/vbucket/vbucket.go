@@ -155,12 +155,10 @@ func (m *Mgr) ListVBuckets() ([]*VBucket, error) {
 
 // AllocPoolAndBucket xxx
 func (m *Mgr) AllocPoolAndBucket(vbucket, object string) (string, string) {
-	// TODO(yangchunxin):
-	// 1. select pool
-
-	// 2. select bucket
-	poolID, bucket := "", ""
-	return poolID, bucket
+	// XXX: vbucket has cached
+	vb := m.VBuckets[vbucket]
+	bucket := m.PoolMgr.AllocBucket(vb.Pool)
+	return vb.Pool, bucket
 }
 
 // GetPoolAndBucket xxx

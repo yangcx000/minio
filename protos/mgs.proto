@@ -90,12 +90,12 @@ message QueryPoolResponse {
     Pool pool = 2;
 }
 
-message ListPoolRequest {
+message ListPoolsRequest {
     string prev = 1;
     int32 limits = 2; 
 }
 
-message ListPoolResponse {
+message ListPoolsResponse {
     Status status = 1;
     string next = 2;
     repeated Pool pool_list = 3;
@@ -128,13 +128,13 @@ message QueryBucketResponse {
     Bucket bucket = 2;
 }
 
-message ListBucketRequest {
+message ListBucketsRequest {
     string prev = 1;
     int32 limits = 2; 
     string pool_id = 3;
 }
 
-message ListBucketResponse {
+message ListBucketsResponse {
     Status status = 1;
     string next = 2;
     repeated Bucket bucket_list = 3;
@@ -166,12 +166,12 @@ message QueryVBucketResponse{
     VBucket vbucket = 2;
 }
 
-message ListVBucketRequest {
+message ListVBucketsRequest {
     string prev = 1;
     int32 limits = 2; 
 }
 
-message ListVBucketResponse{
+message ListVBucketsResponse{
     Status status = 1;
     string next = 2;
     repeated VBucket vbuckets = 3;
@@ -189,15 +189,15 @@ service MgsService {
   rpc DeletePool(DeletePoolRequest) returns (DeletePoolResponse) {}
   rpc UpdatePool(UpdatePoolRequest) returns (UpdatePoolResponse) {}
   rpc QueryPool(QueryPoolRequest) returns (QueryPoolResponse) {}
-  rpc ListPool(ListPoolRequest) returns (ListPoolResponse) {}
+  rpc ListPools(ListPoolsRequest) returns (ListPoolsResponse) {}
   // bucket operations
   rpc AddBucket(AddBucketRequest) returns (AddBucketResponse) {}
   rpc DeleteBucket(DeleteBucketRequest) returns (DeleteBucketResponse) {}
   rpc QueryBucket(QueryBucketRequest) returns (QueryBucketResponse) {}
-  rpc ListBucket(ListBucketRequest) returns (ListBucketResponse) {}
+  rpc ListBuckets(ListBucketsRequest) returns (ListBucketsResponse) {}
   // vbucket operations
   rpc CreateVBucket(CreateVBucketRequest) returns (CreateVBucketResponse) {}
   rpc DeleteVBucket(DeleteVBucketRequest) returns (DeleteVBucketResponse) {}
   rpc QueryVBucket(QueryVBucketRequest) returns (QueryVBucketResponse) {}
-  rpc ListVBucket(ListVBucketRequest) returns (ListVBucketResponse) {}
+  rpc ListVBuckets(ListVBucketsRequest) returns (ListVBucketsResponse) {}
 }

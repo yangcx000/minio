@@ -42,19 +42,19 @@ func (s *Service) Close() {
 }
 
 // ListPools xxx
-func (s *Service) ListPools() (*protos.ListPoolResponse, error) {
-	req := &protos.ListPoolRequest{}
+func (s *Service) ListPools() (*protos.ListPoolsResponse, error) {
+	req := &protos.ListPoolsRequest{}
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
-	return s.svc.ListPool(ctx, req)
+	return s.svc.ListPools(ctx, req)
 }
 
 // ListBuckets xxx
-func (s *Service) ListBuckets(poolID string) (*protos.ListBucketResponse, error) {
-	req := &protos.ListBucketRequest{PoolId: poolID}
+func (s *Service) ListBuckets(poolID string) (*protos.ListBucketsResponse, error) {
+	req := &protos.ListBucketsRequest{PoolId: poolID}
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
-	return s.svc.ListBucket(ctx, req)
+	return s.svc.ListBuckets(ctx, req)
 }
 
 // ListMds xxx
@@ -103,9 +103,9 @@ func (s *Service) QueryVBucket(name string) (*protos.QueryVBucketResponse, error
 }
 
 // ListVBuckets xxx
-func (s *Service) ListVBuckets() (*protos.ListVBucketResponse, error) {
-	req := &protos.ListVBucketRequest{}
+func (s *Service) ListVBuckets() (*protos.ListVBucketsResponse, error) {
+	req := &protos.ListVBucketsRequest{}
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
-	return s.svc.ListVBucket(ctx, req)
+	return s.svc.ListVBuckets(ctx, req)
 }

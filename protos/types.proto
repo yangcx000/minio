@@ -71,22 +71,24 @@ message VBucket {
 
 // object
 message Object {
-  string bucket = 1;
-  string name = 2;
-  string etag = 3;
-  string inner_etag = 4;
-  string version_id = 5;
-  string content_type = 6;
-  string content_encoding = 7;
-  string storage_class = 8; 
-  string user_tags = 9;
-  int64 size = 10;
-  bool is_dir = 11;
-  bool is_latest = 12;
-  bool delete_marker = 13; 
-  bool restore_ongoing = 14;
-  google.protobuf.Timestamp mod_time = 15;
-  google.protobuf.Timestamp acc_time = 16;
-  google.protobuf.Timestamp expires = 17;
-  google.protobuf.Timestamp restore_expires = 18;
+  string name = 1;
+  string vbucket = 2;
+  string pool = 3;
+  string bucket = 4;
+  string etag = 5;
+  string inner_etag = 6;
+  string version_id = 7;
+  string content_type = 8;
+  string content_encoding = 9;
+  string storage_class = 10; 
+  string user_tags = 11;
+  int64 size = 12;
+  bool is_dir = 13;
+  bool is_latest = 14;
+  bool delete_marker = 15; 
+  bool restore_ongoing = 16;
+  google.protobuf.Timestamp mod_time = 17;
+  google.protobuf.Timestamp acc_time = 18;
+  google.protobuf.Timestamp expires = 19;
+  google.protobuf.Timestamp restore_expires = 20;
 }

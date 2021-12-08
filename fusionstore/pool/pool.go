@@ -101,6 +101,14 @@ func (p *Pool) ListBuckets() ([]*Bucket, error) {
 	return buckets, nil
 }
 
+func (p *Pool) allocBucket() string {
+	// FIXME(yangchunxin): design algorithm
+	for key := range p.Buckets {
+		return key
+	}
+	return ""
+}
+
 // Mgr xxx
 type Mgr struct {
 	Pools map[string]*Pool
@@ -157,4 +165,11 @@ func (m *Mgr) AllocPool(vbucket string) string {
 		return poolID
 	}
 	return ""
+}
+
+// AllocBucket xxx
+func (m *Mgr) AllocBucket(pool string) string {
+	// XXX: pool has cached
+	p := m.Pools[pool]
+	return p.allocBucket()
 }
