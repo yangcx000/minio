@@ -348,7 +348,7 @@ func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *
 		SendContentMd5: true,
 	}
 	// get pool id and bucket name
-	pID, pBucket := s.VBucketMgr.AllocPoolAndBucket(bucket, object)
+	pID, pBucket := s.VBucketMgr.GetPoolAndBucket(bucket, object)
 	ui, err := s.Pools[pID].PutObject(ctx, pBucket, object, data, data.Size(), data.MD5Base64String(), data.SHA256HexString(), putOpts)
 	if err != nil {
 		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)

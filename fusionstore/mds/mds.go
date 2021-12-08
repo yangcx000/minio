@@ -95,8 +95,8 @@ func (m *Mgr) ListMds() ([]*Mds, error) {
 	return mdsList, nil
 }
 
-// AllocMds xxx
-func (m *Mgr) AllocMds(vbucket string) string {
+// SelectMds xxx
+func (m *Mgr) SelectMds(vbucket string) string {
 	_ = vbucket
 	// FIXME(yangchunxin): design algorithm
 	for mdsID := range m.MdsMap {

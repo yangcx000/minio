@@ -167,8 +167,8 @@ func (m *Mgr) AllocPool(vbucket string) string {
 	return ""
 }
 
-// AllocBucket xxx
-func (m *Mgr) AllocBucket(pool string) string {
+// SelectPool xxx
+func (m *Mgr) SelectPool(pool string) string {
 	// XXX: pool has cached
 	p := m.Pools[pool]
 	return p.allocBucket()

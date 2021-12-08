@@ -12,22 +12,24 @@ import (
 	minio "github.com/minio/minio/cmd"
 	"github.com/minio/minio/fusionstore/mds"
 	"github.com/minio/minio/fusionstore/mgs"
+	"github.com/minio/minio/fusionstore/object"
 	"github.com/minio/minio/fusionstore/pool"
 	"github.com/minio/minio/protos"
 )
 
 // VBucket xxx
 type VBucket struct {
-	ID          string    `json:"id,omitempty"`
-	Name        string    `json:"name"`
-	Status      string    `json:"status,omitempty"`
-	Owner       string    `json:"owner,omitempty"`
-	Pool        string    `json:"pool,omitempty"`
-	Mds         string    `json:"mds,omitempty"`
-	Location    string    `json:"location,omitempty"`
-	Version     int       `json:"version,omitempty"`
-	CreatedTime time.Time `json:"created_time,omitempty"`
-	UpdatedTime time.Time `json:"updated_time,omitempty"`
+	ID          string                    `json:"id,omitempty"`
+	Name        string                    `json:"name"`
+	Status      string                    `json:"status,omitempty"`
+	Owner       string                    `json:"owner,omitempty"`
+	Pool        string                    `json:"pool,omitempty"`
+	Mds         string                    `json:"mds,omitempty"`
+	Location    string                    `json:"location,omitempty"`
+	Version     int                       `json:"version,omitempty"`
+	Objects     map[string]*object.Object `json:"objects,omitempty"`
+	CreatedTime time.Time                 `json:"created_time,omitempty"`
+	UpdatedTime time.Time                 `json:"updated_time,omitempty"`
 }
 
 // DecodeFromPb xxx
@@ -42,6 +44,15 @@ func (v *VBucket) DecodeFromPb(p *protos.VBucket) {
 	v.Version = int(p.GetVersion())
 	v.CreatedTime = p.GetCreatedTime().AsTime()
 	v.UpdatedTime = p.GetUpdatedTime().AsTime()
+}
+
+func (v *VBucket) getObject(object string) *object.Object {
+	obj, exists := v.Objects[object]
+	if exists {
+		return obj
+	}
+	// XXX
+	return nil
 }
 
 // Mgr xxx
@@ -68,6 +79,7 @@ func (m *Mgr) init() error {
 	if m.MdsMgr, err = mds.NewMgr(); err != nil {
 		return err
 	}
+	// XXX(yangchunxin): fixme
 	vbs, err := m.ListVBuckets()
 	if err != nil {
 		return err
@@ -79,15 +91,16 @@ func (m *Mgr) init() error {
 	return nil
 }
 
-// MakeVBucket xxx
-func (m *Mgr) MakeVBucket(vbucket, location string) error {
-	vb, err := m.GetVBucketInfo(vbucket)
-	if err != nil {
-		return err
-	} else if vb != nil {
-		return fmt.Errorf("bucket %q exists", vbucket)
+func (m *Mgr) getVBucket(vbucket string) *VBucket {
+	vb, _ = m.queryVBucket(vbucket)
+	if vb != nil {
+		m.VBuckets[vb.Name] = vb
 	}
-	pool, mds := m.PoolMgr.AllocPool(vbucket), m.MdsMgr.AllocMds(vbucket)
+	return vb
+}
+
+/* vbucket apis */
+func (m *Mgr) createVBucket(vbucket, location, pool, mds string) error {
 	resp, err := mgs.GlobalService.CreateVBucket(vbucket, location, pool, mds)
 	if err != nil {
 		return err
@@ -95,32 +108,11 @@ func (m *Mgr) MakeVBucket(vbucket, location string) error {
 	if resp.GetStatus().Code != protos.Code_OK {
 		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
-	// TODO(yangchunxin): refactor it
-	m.VBuckets[vbucket] = &VBucket{
-		Name:     vbucket,
-		Pool:     pool,
-		Mds:      mds,
-		Location: location,
-	}
 	return nil
 }
 
-// DeleteVBucket xxx
-func (m *Mgr) DeleteVBucket(bucket string) error {
-	resp, err := mgs.GlobalService.DeleteVBucket(bucket)
-	if err != nil {
-		return err
-	}
-	if resp.GetStatus().Code != protos.Code_OK {
-		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
-	}
-	delete(m.VBuckets, bucket)
-	return nil
-}
-
-// GetVBucketInfo xxx
-func (m *Mgr) GetVBucketInfo(bucket string) (*VBucket, error) {
-	resp, err := mgs.GlobalService.QueryVBucket(bucket)
+func (m *Mgr) queryVBucket(vbucket string) (*VBucket, error) {
+	resp, err := mgs.GlobalService.QueryVBucket(vbucket)
 	if err != nil {
 		return nil, err
 	}
@@ -135,8 +127,18 @@ func (m *Mgr) GetVBucketInfo(bucket string) (*VBucket, error) {
 	return vb, nil
 }
 
-// ListVBuckets xxx
-func (m *Mgr) ListVBuckets() ([]*VBucket, error) {
+func (m *Mgr) deleteVBucket(vbucket string) error {
+	resp, err := mgs.GlobalService.DeleteVBucket(vbucket)
+	if err != nil {
+		return err
+	}
+	if resp.GetStatus().Code != protos.Code_OK {
+		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
+	}
+	return nil
+}
+
+func (m *Mgr) listVBuckets() ([]*VBucket, error) {
 	resp, err := mgs.GlobalService.ListVBuckets()
 	if err != nil {
 		return nil, err
@@ -153,16 +155,60 @@ func (m *Mgr) ListVBuckets() ([]*VBucket, error) {
 	return vbs, nil
 }
 
-// AllocPoolAndBucket xxx
-func (m *Mgr) AllocPoolAndBucket(vbucket, object string) (string, string) {
-	// XXX: vbucket has cached
-	vb := m.VBuckets[vbucket]
+/* end vbucket apis */
+
+// MakeVBucket xxx
+func (m *Mgr) MakeVBucket(vbucket, location string) error {
+	vb, err := m.queryVBucket(vbucket)
+	if err != nil {
+		return err
+	}
+	if vb != nil {
+		return fmt.Errorf("bucket %q already exists", vbucket)
+	}
+	pool, mds := m.PoolMgr.SelectPool(vbucket), m.MdsMgr.SelectMds(vbucket)
+	err = m.createVBucket(vbucket, location, pool, mds)
+	if err != nil {
+		return err
+	}
+	_ = m.getVBucket(vbucket)
+	return nil
+}
+
+// DeleteVBucket xxx
+func (m *Mgr) DeleteVBucket(vbucket string) error {
+	err := m.deleteVBucket(vbucket)
+	if err != nil {
+		return err
+	}
+	delete(m.VBuckets, vbucket)
+	return nil
+}
+
+// GetVBucketInfo xxx
+func (m *Mgr) GetVBucketInfo(vbucket string) (*VBucket, error) {
+	return m.queryVBucket(vbucket)
+}
+
+// ListVBuckets xxx
+func (m *Mgr) ListVBuckets() ([]*VBucket, error) {
+	return m.listVBuckets()
+}
+
+// GetPoolAndBucket xxx
+func (m *Mgr) GetPoolAndBucket(vbucket, object string) (string, string) {
+	vb := getVBucket(vbucket)
+	if vb == nil {
+		return "", ""
+	}
+	// FIXME(yangchunxin): xxx
 	bucket := m.PoolMgr.AllocBucket(vb.Pool)
 	return vb.Pool, bucket
 }
 
 // GetPoolAndBucket xxx
 func (m *Mgr) GetPoolAndBucket(vbucket, object string) (string, string) {
+
 	return "", ""
 }
 
@@ -172,7 +218,7 @@ func (m *Mgr) PutObjectMeta(pID, pBucket string, objInfo minio.ObjectInfo) error
 }
 
 // GetObjectMeta xxx
-func (m *Mgr) GetObjectMeta(bucket, object string) (minio.ObjectInfo, error) {
+func (m *Mgr) GetObjectMeta(vbucket, object string) (minio.ObjectInfo, error) {
 	return minio.ObjectInfo{}, nil
 }
 
