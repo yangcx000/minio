@@ -149,12 +149,12 @@ func (m *Mgr) ListPools() ([]*Pool, error) {
 	return pools, nil
 }
 
-// GetPoolByBucket xxx
-//func (m *Mgr) GetPoolByBucket(bucketName string) string {
-//	// FIXME: design pool select algorithm
-//	ids := []string{}
-//	for k := range m.PoolMap {
-//		ids = append(ids, k)
-//	}
-//	return ids[0]
-//}
+// AllocPool xxx
+func (m *Mgr) AllocPool(vbucket string) string {
+	_ = vbucket
+	// FIXME(yangchunxin): design algorithm
+	for poolID := range m.Pools {
+		return poolID
+	}
+	return ""
+}

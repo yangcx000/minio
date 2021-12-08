@@ -185,7 +185,7 @@ func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string, opts 
 	if s3utils.CheckValidBucketName(bucket) != nil {
 		return minio.BucketNameInvalid{Bucket: bucket}
 	}
-	err := s.VBucketMgr.MakeBucket(bucket, opts.Location)
+	err := s.VBucketMgr.MakeVBucket(bucket, opts.Location)
 	if err != nil {
 		return minio.ErrorRespToObjectError(err, bucket)
 	}
@@ -194,7 +194,7 @@ func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string, opts 
 
 // GetBucketInfo gets bucket metadata..
 func (s *Store) GetBucketInfo(ctx context.Context, bucket string) (bi minio.BucketInfo, e error) {
-	vb, err := s.VBucketMgr.GetBucketInfo(bucket)
+	vb, err := s.VBucketMgr.GetVBucketInfo(bucket)
 	if err != nil {
 		return bi, minio.ErrorRespToObjectError(err)
 	}
@@ -209,7 +209,7 @@ func (s *Store) GetBucketInfo(ctx context.Context, bucket string) (bi minio.Buck
 
 // ListBuckets lists all buckets
 func (s *Store) ListBuckets(ctx context.Context) ([]minio.BucketInfo, error) {
-	vbs, err := s.VBucketMgr.ListBuckets()
+	vbs, err := s.VBucketMgr.ListVBuckets()
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err)
 	}
@@ -225,7 +225,7 @@ func (s *Store) ListBuckets(ctx context.Context) ([]minio.BucketInfo, error) {
 
 // DeleteBucket deletes a bucket
 func (s *Store) DeleteBucket(ctx context.Context, bucket string, opts minio.DeleteBucketOptions) error {
-	err := s.VBucketMgr.DeleteBucket(bucket)
+	err := s.VBucketMgr.DeleteVBucket(bucket)
 	if err != nil {
 		return minio.ErrorRespToObjectError(err, bucket)
 	}
@@ -262,30 +262,27 @@ func (s *Store) ListObjectsV2(ctx context.Context, bucket, prefix, continuationT
 
 // GetObjectNInfo - returns object info and locked object ReadCloser
 func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *minio.HTTPRangeSpec, h http.Header, lockType minio.LockType, opts minio.ObjectOptions) (gr *minio.GetObjectReader, err error) {
-	/*
-		var objInfo minio.ObjectInfo
-		objInfo, err = l.GetObjectInfo(ctx, bucket, object, opts)
-		if err != nil {
-			return nil, minio.ErrorRespToObjectError(err, bucket, object)
-		}
+	var objInfo minio.ObjectInfo
+	objInfo, err = s.GetObjectInfo(ctx, bucket, object, opts)
+	if err != nil {
+		return nil, minio.ErrorRespToObjectError(err, bucket, object)
+	}
 
-		fn, off, length, err := minio.NewGetObjectReader(rs, objInfo, opts)
-		if err != nil {
-			return nil, minio.ErrorRespToObjectError(err, bucket, object)
-		}
+	fn, off, length, err := minio.NewGetObjectReader(rs, objInfo, opts)
+	if err != nil {
+		return nil, minio.ErrorRespToObjectError(err, bucket, object)
+	}
 
-		pr, pw := io.Pipe()
-		go func() {
-			err := l.getObject(ctx, bucket, object, off, length, pw, objInfo.ETag, opts)
-			pw.CloseWithError(err)
-		}()
+	pr, pw := io.Pipe()
+	go func() {
+		err := s.getObject(ctx, bucket, object, off, length, pw, objInfo.ETag, opts)
+		pw.CloseWithError(err)
+	}()
 
-		// Setup cleanup function to cause the above go-routine to
-		// exit in case of partial read
-		pipeCloser := func() { pr.Close() }
-		return fn(pr, h, pipeCloser)
-	*/
-	return nil, nil
+	// Setup cleanup function to cause the above go-routine to
+	// exit in case of partial read
+	pipeCloser := func() { pr.Close() }
+	return fn(pr, h, pipeCloser)
 }
 
 // GetObject reads an object from S3. Supports additional
@@ -295,52 +292,38 @@ func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *m
 // startOffset indicates the starting read location of the object.
 // length indicates the total length of the object.
 func (s *Store) getObject(ctx context.Context, bucket string, key string, startOffset int64, length int64, writer io.Writer, etag string, o minio.ObjectOptions) error {
-	/*
-		if length < 0 && length != -1 {
-			return minio.ErrorRespToObjectError(minio.InvalidRange{}, bucket, key)
-		}
-
-		opts := miniogo.GetObjectOptions{}
-		opts.ServerSideEncryption = o.ServerSideEncryption
-
-		if startOffset >= 0 && length >= 0 {
-			if err := opts.SetRange(startOffset, startOffset+length-1); err != nil {
-				return minio.ErrorRespToObjectError(err, bucket, key)
-			}
-		}
-
-		if etag != "" {
-			opts.SetMatchETag(etag)
-		}
-
-		poolID := l.GetPool(bucket)
-		object, _, _, err := l.Clients[poolID].GetObject(ctx, bucket, key, opts)
-		if err != nil {
+	if length < 0 && length != -1 {
+		return minio.ErrorRespToObjectError(minio.InvalidRange{}, bucket, key)
+	}
+	opts := miniogo.GetObjectOptions{}
+	opts.ServerSideEncryption = o.ServerSideEncryption
+	if startOffset >= 0 && length >= 0 {
+		if err := opts.SetRange(startOffset, startOffset+length-1); err != nil {
 			return minio.ErrorRespToObjectError(err, bucket, key)
 		}
-		defer object.Close()
-		if _, err := io.Copy(writer, object); err != nil {
-			return minio.ErrorRespToObjectError(err, bucket, key)
-		}
-		return nil
-	*/
+	}
+	if etag != "" {
+		opts.SetMatchETag(etag)
+	}
+	pID, pBucket := s.VBucketMgr.GetPoolAndBucket(bucket, key)
+	object, _, _, err := s.Pools[pID].GetObject(ctx, pBucket, key, opts)
+	if err != nil {
+		return minio.ErrorRespToObjectError(err, bucket, key)
+	}
+	defer object.Close()
+	if _, err := io.Copy(writer, object); err != nil {
+		return minio.ErrorRespToObjectError(err, bucket, key)
+	}
 	return nil
 }
 
 // GetObjectInfo reads object info and replies back ObjectInfo
 func (s *Store) GetObjectInfo(ctx context.Context, bucket string, object string, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	/*
-		poolID := l.GetPool(bucket)
-		oi, err := l.Clients[poolID].StatObject(ctx, bucket, object, miniogo.StatObjectOptions{
-			ServerSideEncryption: opts.ServerSideEncryption,
-		})
-		if err != nil {
-			return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
-		}
-
-		return minio.FromMinioClientObjectInfo(bucket, oi), nil
-	*/
-	return minio.ObjectInfo{}, nil
+	objInfo, err = s.VBucketMgr.GetObjectMeta(bucket, object)
+	if err != nil {
+		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	return objInfo, nil
 }
 
 // PutObject creates a new object with the incoming data,
@@ -421,37 +404,35 @@ func (s *Store) CopyObject(ctx context.Context, srcBucket string, srcObject stri
 
 // DeleteObject deletes a blob in bucket
 func (s *Store) DeleteObject(ctx context.Context, bucket string, object string, opts minio.ObjectOptions) (minio.ObjectInfo, error) {
-	/*
-		poolID := l.GetPool(bucket)
-		err := l.Clients[poolID].RemoveObject(ctx, bucket, object, miniogo.RemoveObjectOptions{})
-		if err != nil {
-			return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
-		}
-
-		return minio.ObjectInfo{
-			Bucket: bucket,
-			Name:   object,
-		}, nil
-	*/
-	return minio.ObjectInfo{}, nil
+	pID, pBucket := s.VBucketMgr.GetPoolAndBucket(bucket, object)
+	err := s.Pools[pID].RemoveObject(ctx, pBucket, object, miniogo.RemoveObjectOptions{})
+	if err != nil {
+		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	objInfo := minio.ObjectInfo{
+		Bucket: bucket,
+		Name:   object,
+	}
+	err = s.VBucketMgr.DeleteObjectMeta(pID, pBucket, objInfo)
+	if err != nil {
+		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	return objInfo, nil
 }
 
 // DeleteObjects xxx
 func (s *Store) DeleteObjects(ctx context.Context, bucket string, objects []minio.ObjectToDelete, opts minio.ObjectOptions) ([]minio.DeletedObject, []error) {
-	/*
-		errs := make([]error, len(objects))
-		dobjects := make([]minio.DeletedObject, len(objects))
-		for idx, object := range objects {
-			_, errs[idx] = l.DeleteObject(ctx, bucket, object.ObjectName, opts)
-			if errs[idx] == nil {
-				dobjects[idx] = minio.DeletedObject{
-					ObjectName: object.ObjectName,
-				}
+	errs := make([]error, len(objects))
+	dobjects := make([]minio.DeletedObject, len(objects))
+	for idx, object := range objects {
+		_, errs[idx] = s.DeleteObject(ctx, bucket, object.ObjectName, opts)
+		if errs[idx] == nil {
+			dobjects[idx] = minio.DeletedObject{
+				ObjectName: object.ObjectName,
 			}
 		}
-		return dobjects, errs
-	*/
-	return nil, nil
+	}
+	return dobjects, errs
 }
 
 // ListMultipartUploads lists all multipart uploads.

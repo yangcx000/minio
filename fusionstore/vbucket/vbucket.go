@@ -68,7 +68,7 @@ func (m *Mgr) init() error {
 	if m.MdsMgr, err = mds.NewMgr(); err != nil {
 		return err
 	}
-	vbs, err := m.ListBuckets()
+	vbs, err := m.ListVBuckets()
 	if err != nil {
 		return err
 	}
@@ -79,17 +79,16 @@ func (m *Mgr) init() error {
 	return nil
 }
 
-// MakeBucket xxx
-func (m *Mgr) MakeBucket(bucket, location string) error {
-	vb, err := m.GetBucketInfo(bucket)
+// MakeVBucket xxx
+func (m *Mgr) MakeVBucket(vbucket, location string) error {
+	vb, err := m.GetVBucketInfo(vbucket)
 	if err != nil {
 		return err
 	} else if vb != nil {
-		return fmt.Errorf("bucket %q exists", bucket)
+		return fmt.Errorf("bucket %q exists", vbucket)
 	}
-	// TODO(yangchunxin): select pool and mds
-	pool, mds := "pool-yglkr", "mds-nilcc"
-	resp, err := mgs.GlobalService.CreateVBucket(bucket, location, pool, mds)
+	pool, mds := m.PoolMgr.AllocPool(vbucket), m.MdsMgr.AllocMds(vbucket)
+	resp, err := mgs.GlobalService.CreateVBucket(vbucket, location, pool, mds)
 	if err != nil {
 		return err
 	}
@@ -97,8 +96,8 @@ func (m *Mgr) MakeBucket(bucket, location string) error {
 		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
 	// TODO(yangchunxin): refactor it
-	m.VBuckets[bucket] = &VBucket{
-		Name:     bucket,
+	m.VBuckets[vbucket] = &VBucket{
+		Name:     vbucket,
 		Pool:     pool,
 		Mds:      mds,
 		Location: location,
@@ -106,8 +105,8 @@ func (m *Mgr) MakeBucket(bucket, location string) error {
 	return nil
 }
 
-// DeleteBucket xxx
-func (m *Mgr) DeleteBucket(bucket string) error {
+// DeleteVBucket xxx
+func (m *Mgr) DeleteVBucket(bucket string) error {
 	resp, err := mgs.GlobalService.DeleteVBucket(bucket)
 	if err != nil {
 		return err
@@ -119,8 +118,8 @@ func (m *Mgr) DeleteBucket(bucket string) error {
 	return nil
 }
 
-// GetBucketInfo xxx
-func (m *Mgr) GetBucketInfo(bucket string) (*VBucket, error) {
+// GetVBucketInfo xxx
+func (m *Mgr) GetVBucketInfo(bucket string) (*VBucket, error) {
 	resp, err := mgs.GlobalService.QueryVBucket(bucket)
 	if err != nil {
 		return nil, err
@@ -136,8 +135,8 @@ func (m *Mgr) GetBucketInfo(bucket string) (*VBucket, error) {
 	return vb, nil
 }
 
-// ListBuckets xxx
-func (m *Mgr) ListBuckets() ([]*VBucket, error) {
+// ListVBuckets xxx
+func (m *Mgr) ListVBuckets() ([]*VBucket, error) {
 	resp, err := mgs.GlobalService.ListVBuckets()
 	if err != nil {
 		return nil, err
@@ -164,7 +163,22 @@ func (m *Mgr) AllocPoolAndBucket(vbucket, object string) (string, string) {
 	return poolID, bucket
 }
 
+// GetPoolAndBucket xxx
+func (m *Mgr) GetPoolAndBucket(vbucket, object string) (string, string) {
+	return "", ""
+}
+
 // PutObjectMeta xxx
 func (m *Mgr) PutObjectMeta(pID, pBucket string, objInfo minio.ObjectInfo) error {
+	return nil
+}
+
+// GetObjectMeta xxx
+func (m *Mgr) GetObjectMeta(bucket, object string) (minio.ObjectInfo, error) {
+	return minio.ObjectInfo{}, nil
+}
+
+// DeleteObjectMeta xxx
+func (m *Mgr) DeleteObjectMeta(pID, pBucket string, objInfo minio.ObjectInfo) error {
 	return nil
 }
