@@ -77,6 +77,11 @@ func (m *Mgr) init() error {
 	return nil
 }
 
+// GetService xxx
+func (m *Mgr) GetService(mdsID string) *Service {
+	return m.MdsServices[mdsID]
+}
+
 // ListMds xxx
 func (m *Mgr) ListMds() ([]*Mds, error) {
 	resp, err := mgs.GlobalService.ListMds()

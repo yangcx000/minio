@@ -101,7 +101,7 @@ func (p *Pool) ListBuckets() ([]*Bucket, error) {
 	return buckets, nil
 }
 
-func (p *Pool) allocBucket() string {
+func (p *Pool) selectBucket() string {
 	// FIXME(yangchunxin): design algorithm
 	for key := range p.Buckets {
 		return key
@@ -157,19 +157,18 @@ func (m *Mgr) ListPools() ([]*Pool, error) {
 	return pools, nil
 }
 
-// AllocPool xxx
-func (m *Mgr) AllocPool(vbucket string) string {
-	_ = vbucket
-	// FIXME(yangchunxin): design algorithm
-	for poolID := range m.Pools {
-		return poolID
+// SelectPool xxx
+func (m *Mgr) SelectPool(vbucket string) string {
+	// XXX: design algorithm
+	for k := range m.Pools {
+		return k
 	}
 	return ""
 }
 
-// SelectPool xxx
-func (m *Mgr) SelectPool(pool string) string {
+// SelectBucket xxx
+func (m *Mgr) SelectBucket(pool string) string {
 	// XXX: pool has cached
 	p := m.Pools[pool]
-	return p.allocBucket()
+	return p.selectBucket()
 }

@@ -92,7 +92,7 @@ func (m *Mgr) init() error {
 }
 
 func (m *Mgr) getVBucket(vbucket string) *VBucket {
-	vb, _ = m.queryVBucket(vbucket)
+	vb, _ := m.queryVBucket(vbucket)
 	if vb != nil {
 		m.VBuckets[vb.Name] = vb
 	}
@@ -197,32 +197,117 @@ func (m *Mgr) ListVBuckets() ([]*VBucket, error) {
 
 // GetPoolAndBucket xxx
 func (m *Mgr) GetPoolAndBucket(vbucket, object string) (string, string) {
-	vb := getVBucket(vbucket)
+	vb := m.getVBucket(vbucket)
 	if vb == nil {
 		return "", ""
 	}
 	// FIXME(yangchunxin): xxx
-	bucket := m.PoolMgr.AllocBucket(vb.Pool)
+	bucket := m.PoolMgr.SelectBucket(vb.Pool)
 	return vb.Pool, bucket
 }
 
-// GetPoolAndBucket xxx
-func (m *Mgr) GetPoolAndBucket(vbucket, object string) (string, string) {
+/* object apis */
+func (m *Mgr) putObject(obj *object.Object) error {
+	vb := m.getVBucket(obj.VBucket)
+	srv := m.MdsMgr.GetService(vb.Mds)
+	resp, err := srv.PutObject(obj)
+	if err != nil {
+		return err
+	}
+	if resp.GetStatus().Code != protos.Code_OK {
+		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
+	}
+	return nil
+}
 
-	return "", ""
+func (m *Mgr) getObject(vbucket, objectName string) (*object.Object, error) {
+	vb := m.getVBucket(vbucket)
+	srv := m.MdsMgr.GetService(vb.Mds)
+	resp, err := srv.QueryObject(vbucket, objectName)
+	if err != nil {
+		return nil, err
+	}
+	if resp.GetStatus().Code != protos.Code_OK {
+		if resp.GetStatus().Code == protos.Code_NOT_FOUND {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
+	}
+	obj := &object.Object{}
+	obj.DecodeFromPb(resp.GetObject())
+	return obj, nil
+}
+
+func (m *Mgr) deleteObject(vbucket, object string) error {
+	vb := m.getVBucket(vbucket)
+	srv := m.MdsMgr.GetService(vb.Mds)
+	resp, err := srv.DeleteObject(vbucket, object)
+	if err != nil {
+		return err
+	}
+	if resp.GetStatus().Code != protos.Code_OK {
+		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
+	}
+	return nil
 }
 
 // PutObjectMeta xxx
 func (m *Mgr) PutObjectMeta(pID, pBucket string, objInfo minio.ObjectInfo) error {
-	return nil
+	obj := object.Object{
+		Name:            objInfo.Name,
+		VBucket:         objInfo.Bucket,
+		Pool:            pID,
+		Bucket:          pBucket,
+		Etag:            objInfo.ETag,
+		InnerEtag:       objInfo.InnerETag,
+		VersionID:       objInfo.VersionID,
+		ContentType:     objInfo.ContentType,
+		ContentEncoding: objInfo.ContentEncoding,
+		StorageClass:    objInfo.StorageClass,
+		UserTags:        objInfo.UserTags,
+		Size:            objInfo.Size,
+		IsDir:           objInfo.IsDir,
+		IsLatest:        objInfo.IsLatest,
+		DeleteMarker:    objInfo.DeleteMarker,
+		RestoreOngoing:  objInfo.RestoreOngoing,
+		ModTime:         objInfo.ModTime,
+		AccTime:         objInfo.AccTime,
+		Expires:         objInfo.Expires,
+		RestoreExpires:  objInfo.RestoreExpires,
+	}
+	return m.putObject(&obj)
 }
 
 // GetObjectMeta xxx
 func (m *Mgr) GetObjectMeta(vbucket, object string) (minio.ObjectInfo, error) {
-	return minio.ObjectInfo{}, nil
+	obj, err := m.getObject(vbucket, object)
+	if err != nil {
+		return minio.ObjectInfo{}, err
+	}
+	objInfo := minio.ObjectInfo{
+		Name:            obj.Name,
+		Bucket:          obj.VBucket,
+		ETag:            obj.Etag,
+		InnerETag:       obj.InnerEtag,
+		VersionID:       obj.VersionID,
+		ContentType:     obj.ContentType,
+		ContentEncoding: obj.ContentEncoding,
+		StorageClass:    obj.StorageClass,
+		UserTags:        obj.UserTags,
+		Size:            obj.Size,
+		IsDir:           obj.IsDir,
+		IsLatest:        obj.IsLatest,
+		DeleteMarker:    obj.DeleteMarker,
+		RestoreOngoing:  obj.RestoreOngoing,
+		ModTime:         obj.ModTime,
+		AccTime:         obj.AccTime,
+		Expires:         obj.Expires,
+		RestoreExpires:  obj.RestoreExpires,
+	}
+	return objInfo, nil
 }
 
 // DeleteObjectMeta xxx
-func (m *Mgr) DeleteObjectMeta(pID, pBucket string, objInfo minio.ObjectInfo) error {
-	return nil
+func (m *Mgr) DeleteObjectMeta(vbucket, object string) error {
+	return m.deleteObject(vbucket, object)
 }

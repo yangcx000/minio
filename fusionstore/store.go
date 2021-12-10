@@ -413,7 +413,7 @@ func (s *Store) DeleteObject(ctx context.Context, bucket string, object string, 
 		Bucket: bucket,
 		Name:   object,
 	}
-	err = s.VBucketMgr.DeleteObjectMeta(pID, pBucket, objInfo)
+	err = s.VBucketMgr.DeleteObjectMeta(bucket, object)
 	if err != nil {
 		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
 	}
