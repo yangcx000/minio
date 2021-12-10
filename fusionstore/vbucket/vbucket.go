@@ -6,6 +6,7 @@
 package vbucket
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,6 +17,8 @@ import (
 	"github.com/minio/minio/fusionstore/pool"
 	"github.com/minio/minio/protos"
 )
+
+const scanLimits = 100
 
 // VBucket xxx
 type VBucket struct {
@@ -167,6 +170,7 @@ func (m *Mgr) listVBuckets() ([]*VBucket, error) {
 
 // MakeVBucket xxx
 func (m *Mgr) MakeVBucket(vbucket, location string) error {
+	// query mds directly
 	vb, err := m.queryVBucket(vbucket)
 	if err != nil {
 		return err
@@ -175,10 +179,14 @@ func (m *Mgr) MakeVBucket(vbucket, location string) error {
 		return fmt.Errorf("bucket %q already exists", vbucket)
 	}
 	pool, mds := m.PoolMgr.SelectPool(vbucket), m.MdsMgr.SelectMds(vbucket)
+	if len(pool) == 0 || len(mds) == 0 {
+		return errors.New("couldn't alloc pool or mds")
+	}
 	err = m.createVBucket(vbucket, location, pool, mds)
 	if err != nil {
 		return err
 	}
+	// query and add vbucket to cache
 	_ = m.getVBucket(vbucket)
 	return nil
 }
@@ -195,6 +203,7 @@ func (m *Mgr) DeleteVBucket(vbucket string) error {
 
 // GetVBucketInfo xxx
 func (m *Mgr) GetVBucketInfo(vbucket string) (*VBucket, error) {
+	// query mds directly
 	return m.queryVBucket(vbucket)
 }
 
@@ -259,15 +268,25 @@ func (m *Mgr) deleteObject(vbucket, object string) error {
 	return nil
 }
 
-func (m *Mgr) listObjects(vbucket, marker string, limits int) ([]*object.Object, error) {
+func (m *Mgr) listObjects(vbucket, marker string, numObjects int) ([]*object.Object, string, error) {
+	nextMarker := ""
 	vb := m.getVBucket(vbucket)
+	if vb == nil {
+		return nil, nextMarker, errors.New("couldn't get vbucket")
+	}
 	srv := m.MdsMgr.GetService(vb.Mds)
-	resp, err := srv.ListObjects(vbucket, marker, int32(limits))
+	if srv == nil {
+		return nil, nextMarker, errors.New("couldn't get mds service")
+	}
+	if numObjects > scanLimits {
+		return nil, nextMarker, fmt.Errorf("object limits must less than %d", scanLimits)
+	}
+	resp, err := srv.ListObjects(vbucket, marker, int32(numObjects))
 	if err != nil {
-		return nil, err
+		return nil, nextMarker, err
 	}
 	if resp.GetStatus().Code != protos.Code_OK {
-		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
+		return nil, nextMarker, fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
 	objs := make([]*object.Object, len(resp.GetObjects()))
 	for i, v := range resp.GetObjects() {
@@ -275,7 +294,8 @@ func (m *Mgr) listObjects(vbucket, marker string, limits int) ([]*object.Object,
 		obj.DecodeFromPb(v)
 		objs[i] = obj
 	}
-	return objs, nil
+	nextMarker = resp.GetNext()
+	return objs, nextMarker, nil
 }
 
 // PutObjectMeta xxx
@@ -340,8 +360,8 @@ func (m *Mgr) DeleteObjectMeta(vbucket, object string) error {
 }
 
 // ListObjects xxx
-func (m *Mgr) ListObjects(vbucket, perfix, marker, delimiter string, maxKeys int) (minio.ListObjectsInfo, error) {
-	objs, err := m.listObjects(vbucket, marker, maxKeys)
+func (m *Mgr) ListObjects(vbucket, prefix, marker, delimiter string, maxKeys int) (minio.ListObjectsInfo, error) {
+	objs, nextMarker, err := m.listObjects(vbucket, marker, maxKeys)
 	if err != nil {
 		return minio.ListObjectsInfo{}, err
 	}
@@ -370,6 +390,7 @@ func (m *Mgr) ListObjects(vbucket, perfix, marker, delimiter string, maxKeys int
 		objInfos[i] = objInfo
 	}
 	return minio.ListObjectsInfo{
-		Objects: objInfos,
+		Objects:    objInfos,
+		NextMarker: nextMarker,
 	}, nil
 }

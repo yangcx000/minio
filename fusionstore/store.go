@@ -92,20 +92,20 @@ func (s *Store) init(mgsAddr string, transport http.RoundTripper) error {
 	if s.VBucketMgr, err = vbucket.NewMgr(); err != nil {
 		return err
 	}
-	if err = s.setupClients(transport); err != nil {
+	if err = s.initClients(transport); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *Store) setupClients(transport http.RoundTripper) error {
+func (s *Store) initClients(transport http.RoundTripper) error {
 	s.Pools = make(map[string]*miniogo.Core)
 	for k, v := range s.VBucketMgr.PoolMgr.Pools {
 		cred := madmin.Credentials{
 			AccessKey: v.Creds.AccessKey,
 			SecretKey: v.Creds.SecretKey,
 		}
-		core, err := s.newCore("http://"+v.Endpoint, cred, transport)
+		core, err := s.newCore(v.Endpoint, cred, transport)
 		if err != nil {
 			return err
 		}
@@ -166,8 +166,8 @@ func (s *Store) Shutdown(ctx context.Context) error {
 
 // StorageInfo is not relevant to S3 backend.
 func (s *Store) StorageInfo(ctx context.Context) (si minio.StorageInfo, _ []error) {
-	// TODO(yangchunxin): add later
 	si.Backend.Type = madmin.Gateway
+	// TODO(yangchunxin): update later
 	si.Backend.GatewayOnline = true
 	return si, nil
 }
@@ -191,7 +191,7 @@ func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string, opts 
 	if err != nil {
 		return minio.ErrorRespToObjectError(err, bucket)
 	}
-	return err
+	return nil
 }
 
 // GetBucketInfo gets bucket metadata..
@@ -236,25 +236,24 @@ func (s *Store) DeleteBucket(ctx context.Context, bucket string, opts minio.Dele
 
 // ListObjects lists all blobs in S3 bucket filtered by prefix
 func (s *Store) ListObjects(ctx context.Context, bucket string, prefix string, marker string, delimiter string, maxKeys int) (loi minio.ListObjectsInfo, e error) {
-	result, err := s.VBucketMgr.ListObjects(bucket, prefix, marker, delimiter, maxKeys)
+	// Validate bucket name.
+	if err := s3utils.CheckValidBucketName(bucket); err != nil {
+		return minio.ListObjectsInfo{}, err
+	}
+	// Validate object prefix.
+	if err := s3utils.CheckValidObjectNamePrefix(prefix); err != nil {
+		return minio.ListObjectsInfo{}, err
+	}
+	results, err := s.VBucketMgr.ListObjects(bucket, prefix, marker, delimiter, maxKeys)
 	if err != nil {
 		return loi, minio.ErrorRespToObjectError(err, bucket)
 	}
-	return result, nil
+	return results, nil
 }
 
 // ListObjectsV2 lists all blobs in S3 bucket filtered by prefix
 func (s *Store) ListObjectsV2(ctx context.Context, bucket, prefix, continuationToken, delimiter string, maxKeys int, fetchOwner bool, startAfter string) (loi minio.ListObjectsV2Info, e error) {
-	/*
-		poolID := l.GetPool(bucket)
-		result, err := l.Clients[poolID].ListObjectsV2(bucket, prefix, startAfter, continuationToken, delimiter, maxKeys)
-		if err != nil {
-			return loi, minio.ErrorRespToObjectError(err, bucket)
-		}
-
-		return minio.FromMinioClientListBucketV2Result(bucket, result), nil
-	*/
-	return minio.ListObjectsV2Info{}, nil
+	return minio.ListObjectsV2Info{}, minio.NotImplemented{}
 }
 
 // GetObjectNInfo - returns object info and locked object ReadCloser

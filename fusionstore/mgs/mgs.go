@@ -74,7 +74,7 @@ func (s *Service) CreateVBucket(name, location, pool, mds string) (*protos.Creat
 			Mds:      mds,
 			Location: location,
 			// FIXME(yangchunxin): xxx
-			Owner: "ycx",
+			Owner: "li",
 		},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
