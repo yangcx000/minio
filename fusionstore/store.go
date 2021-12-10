@@ -301,7 +301,10 @@ func (s *Store) getObject(ctx context.Context, bucket string, key string, startO
 	if etag != "" {
 		opts.SetMatchETag(etag)
 	}
-	pID, pBucket := s.VBucketMgr.GetPoolAndBucket(bucket, key)
+	pID, pBucket := s.VBucketMgr.GetObjectPoolAndBucket(bucket, key)
+	if len(pID) == 0 || len(pBucket) == 0 {
+		return minio.ErrorRespToObjectError(errors.New("object not found"), bucket, key)
+	}
 	object, _, _, err := s.Pools[pID].GetObject(ctx, pBucket, key, opts)
 	if err != nil {
 		return minio.ErrorRespToObjectError(err, bucket, key)
@@ -345,6 +348,9 @@ func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *
 	}
 	// get pool id and bucket name
 	pID, pBucket := s.VBucketMgr.GetPoolAndBucket(bucket, object)
+	if len(pID) == 0 || len(pBucket) == 0 {
+		return objInfo, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
+	}
 	ui, err := s.Pools[pID].PutObject(ctx, pBucket, object, data, data.Size(), data.MD5Base64String(), data.SHA256HexString(), putOpts)
 	if err != nil {
 		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
@@ -400,7 +406,7 @@ func (s *Store) CopyObject(ctx context.Context, srcBucket string, srcObject stri
 
 // DeleteObject deletes a blob in bucket
 func (s *Store) DeleteObject(ctx context.Context, bucket string, object string, opts minio.ObjectOptions) (minio.ObjectInfo, error) {
-	pID, pBucket := s.VBucketMgr.GetPoolAndBucket(bucket, object)
+	pID, pBucket := s.VBucketMgr.GetObjectPoolAndBucket(bucket, object)
 	err := s.Pools[pID].RemoveObject(ctx, pBucket, object, miniogo.RemoveObjectOptions{})
 	if err != nil {
 		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)

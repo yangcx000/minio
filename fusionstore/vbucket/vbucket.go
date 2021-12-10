@@ -214,13 +214,14 @@ func (m *Mgr) ListVBuckets() ([]*VBucket, error) {
 
 // GetPoolAndBucket xxx
 func (m *Mgr) GetPoolAndBucket(vbucket, object string) (string, string) {
+	pID, pBucket := "", ""
 	vb := m.getVBucket(vbucket)
 	if vb == nil {
-		return "", ""
+		return pID, pBucket
 	}
-	// FIXME(yangchunxin): xxx
-	bucket := m.PoolMgr.SelectBucket(vb.Pool)
-	return vb.Pool, bucket
+	pID = vb.Pool
+	pBucket = m.PoolMgr.SelectBucket(pID)
+	return pID, pBucket
 }
 
 /* object apis */
@@ -393,4 +394,13 @@ func (m *Mgr) ListObjects(vbucket, prefix, marker, delimiter string, maxKeys int
 		Objects:    objInfos,
 		NextMarker: nextMarker,
 	}, nil
+}
+
+// GetObjectPoolAndBucket xxx
+func (m *Mgr) GetObjectPoolAndBucket(vbucket, object string) (pool, bucket string) {
+	obj, err := m.getObject(vbucket, object)
+	if err != nil {
+		return "", ""
+	}
+	return obj.Pool, obj.Bucket
 }

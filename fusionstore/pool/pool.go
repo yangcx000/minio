@@ -170,5 +170,8 @@ func (m *Mgr) SelectPool(vbucket string) string {
 func (m *Mgr) SelectBucket(pool string) string {
 	// XXX: pool has cached
 	p := m.Pools[pool]
+	if p == nil {
+		return ""
+	}
 	return p.selectBucket()
 }
