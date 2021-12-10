@@ -79,12 +79,16 @@ func (m *Mgr) init() error {
 	if m.MdsMgr, err = mds.NewMgr(); err != nil {
 		return err
 	}
-	// XXX(yangchunxin): fixme
+	m.loadVBuckets()
+	return nil
+}
+
+func (m *Mgr) loadVBuckets() error {
 	vbs, err := m.ListVBuckets()
 	if err != nil {
 		return err
 	}
-	m.VBuckets = make(map[string]*VBucket)
+	m.VBuckets = make(map[string]*VBucket, len(vbs))
 	for _, v := range vbs {
 		m.VBuckets[v.Name] = v
 	}
@@ -92,7 +96,11 @@ func (m *Mgr) init() error {
 }
 
 func (m *Mgr) getVBucket(vbucket string) *VBucket {
-	vb, _ := m.queryVBucket(vbucket)
+	vb, exists := m.VBuckets[vbucket]
+	if exists {
+		return vb
+	}
+	vb, _ = m.queryVBucket(vbucket)
 	if vb != nil {
 		m.VBuckets[vb.Name] = vb
 	}
