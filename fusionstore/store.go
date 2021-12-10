@@ -54,8 +54,10 @@ func randString(n int, src rand.Source, prefix string) string {
 // Store xxx
 type Store struct {
 	minio.GatewayUnsupported
+
 	Pools      map[string]*miniogo.Core
 	VBucketMgr *vbucket.Mgr
+
 	HTTPClient *http.Client
 	Metrics    *minio.BackendMetrics
 	debug      bool

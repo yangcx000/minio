@@ -19,7 +19,7 @@ message Mds{
   uint64 used = 6;
   uint64 capacity = 7;
   int32 version = 8;
-  repeated string pdservers = 9;
+  string endpoint = 9;
   string created_time = 10;
   string updated_time = 11;
   // others

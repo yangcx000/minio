@@ -14,17 +14,17 @@ import (
 
 // Mds metadata service
 type Mds struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Type        string   `json:"type"`
-	Status      string   `json:"status"`
-	Region      string   `json:"region"`
-	Used        uint64   `json:"used"`
-	Capacity    uint64   `json:"capacity"`
-	Version     int32    `json:"version"`
-	Pdservers   []string `json:"pdservers,omitempty"`
-	CreatedTime string   `json:"created_time"`
-	UpdatedTime string   `json:"updated_time"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Status      string `json:"status"`
+	Region      string `json:"region"`
+	Used        uint64 `json:"used"`
+	Capacity    uint64 `json:"capacity"`
+	Version     int32  `json:"version"`
+	Endpoint    string `json:"endpoint"`
+	CreatedTime string `json:"created_time"`
+	UpdatedTime string `json:"updated_time"`
 }
 
 // DecodeFromPb xxx
@@ -36,7 +36,7 @@ func (m *Mds) DecodeFromPb(p *protos.Mds) {
 	m.Region = p.GetRegion()
 	m.Used = p.GetUsed()
 	m.Capacity = p.GetCapacity()
-	m.Pdservers = p.GetPdservers()
+	m.Endpoint = p.GetEndpoint()
 	m.Version = p.GetVersion()
 	m.CreatedTime = p.GetCreatedTime()
 	m.UpdatedTime = p.GetUpdatedTime()
@@ -66,8 +66,7 @@ func (m *Mgr) init() error {
 	m.MdsMap = make(map[string]*Mds, len(mdsList))
 	m.MdsServices = make(map[string]*Service, len(mdsList))
 	for _, v := range mdsList {
-		// TODO(yangchunxin): fix it
-		svc, err := NewService(v.Pdservers[0], 10)
+		svc, err := NewService(v.Endpoint, 10)
 		if err != nil {
 			return err
 		}
