@@ -234,16 +234,11 @@ func (s *Store) DeleteBucket(ctx context.Context, bucket string, opts minio.Dele
 
 // ListObjects lists all blobs in S3 bucket filtered by prefix
 func (s *Store) ListObjects(ctx context.Context, bucket string, prefix string, marker string, delimiter string, maxKeys int) (loi minio.ListObjectsInfo, e error) {
-	/*
-		poolID := l.GetPool(bucket)
-		result, err := l.Clients[poolID].ListObjects(bucket, prefix, marker, delimiter, maxKeys)
-		if err != nil {
-			return loi, minio.ErrorRespToObjectError(err, bucket)
-		}
-
-		return minio.FromMinioClientListBucketResult(bucket, result), nil
-	*/
-	return minio.ListObjectsInfo{}, nil
+	result, err := s.VBucketMgr.ListObjects(bucket, prefix, marker, delimiter, maxKeys)
+	if err != nil {
+		return loi, minio.ErrorRespToObjectError(err, bucket)
+	}
+	return result, nil
 }
 
 // ListObjectsV2 lists all blobs in S3 bucket filtered by prefix
@@ -399,7 +394,7 @@ func (s *Store) CopyObject(ctx context.Context, srcBucket string, srcObject stri
 		}
 		return l.GetObjectInfo(ctx, dstBucket, dstObject, dstOpts)
 	*/
-	return minio.ObjectInfo{}, nil
+	return minio.ObjectInfo{}, minio.NotImplemented{}
 }
 
 // DeleteObject deletes a blob in bucket
@@ -467,8 +462,8 @@ func (s *Store) NewMultipartUpload(ctx context.Context, bucket string, object st
 			ServerSideEncryption: o.ServerSideEncryption,
 			UserTags:             tagMap,
 		}
-		poolID := l.GetPool(bucket)
-		uploadID, err = l.Clients[poolID].NewMultipartUpload(ctx, bucket, object, opts)
+		pID, pBucket := s.VBucketMgr.GetPoolAndBucket(bucket, key)
+		uploadID, err = s.Pools[pID].NewMultipartUpload(ctx, pBucket, object, opts)
 		if err != nil {
 			return uploadID, minio.ErrorRespToObjectError(err, bucket, object)
 		}

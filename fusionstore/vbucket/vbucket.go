@@ -251,6 +251,25 @@ func (m *Mgr) deleteObject(vbucket, object string) error {
 	return nil
 }
 
+func (m *Mgr) listObjects(vbucket, marker string, limits int) ([]*object.Object, error) {
+	vb := m.getVBucket(vbucket)
+	srv := m.MdsMgr.GetService(vb.Mds)
+	resp, err := srv.ListObjects(vbucket, marker, int32(limits))
+	if err != nil {
+		return nil, err
+	}
+	if resp.GetStatus().Code != protos.Code_OK {
+		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
+	}
+	objs := make([]*object.Object, len(resp.GetObjects()))
+	for i, v := range resp.GetObjects() {
+		obj := &object.Object{}
+		obj.DecodeFromPb(v)
+		objs[i] = obj
+	}
+	return objs, nil
+}
+
 // PutObjectMeta xxx
 func (m *Mgr) PutObjectMeta(pID, pBucket string, objInfo minio.ObjectInfo) error {
 	obj := object.Object{
@@ -310,4 +329,39 @@ func (m *Mgr) GetObjectMeta(vbucket, object string) (minio.ObjectInfo, error) {
 // DeleteObjectMeta xxx
 func (m *Mgr) DeleteObjectMeta(vbucket, object string) error {
 	return m.deleteObject(vbucket, object)
+}
+
+// ListObjects xxx
+func (m *Mgr) ListObjects(vbucket, perfix, marker, delimiter string, maxKeys int) (minio.ListObjectsInfo, error) {
+	objs, err := m.listObjects(vbucket, marker, maxKeys)
+	if err != nil {
+		return minio.ListObjectsInfo{}, err
+	}
+	objInfos := make([]minio.ObjectInfo, len(objs))
+	for i, obj := range objs {
+		objInfo := minio.ObjectInfo{
+			Name:            obj.Name,
+			Bucket:          obj.VBucket,
+			ETag:            obj.Etag,
+			InnerETag:       obj.InnerEtag,
+			VersionID:       obj.VersionID,
+			ContentType:     obj.ContentType,
+			ContentEncoding: obj.ContentEncoding,
+			StorageClass:    obj.StorageClass,
+			UserTags:        obj.UserTags,
+			Size:            obj.Size,
+			IsDir:           obj.IsDir,
+			IsLatest:        obj.IsLatest,
+			DeleteMarker:    obj.DeleteMarker,
+			RestoreOngoing:  obj.RestoreOngoing,
+			ModTime:         obj.ModTime,
+			AccTime:         obj.AccTime,
+			Expires:         obj.Expires,
+			RestoreExpires:  obj.RestoreExpires,
+		}
+		objInfos[i] = objInfo
+	}
+	return minio.ListObjectsInfo{
+		Objects: objInfos,
+	}, nil
 }

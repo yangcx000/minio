@@ -69,8 +69,8 @@ func (s *Service) QueryObject(vbucket, object string) (*protos.QueryObjectRespon
 }
 
 // ListObjects xxx
-func (s *Service) ListObjects(vbucket string) (*protos.ListObjectsResponse, error) {
-	req := &protos.ListObjectsRequest{Vbucket: vbucket}
+func (s *Service) ListObjects(vbucket, marker string, limits int32) (*protos.ListObjectsResponse, error) {
+	req := &protos.ListObjectsRequest{Vbucket: vbucket, Prev: marker, Limits: limits}
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
 	return s.svc.ListObjects(ctx, req)
