@@ -1,8 +1,14 @@
+/*
+ * Copyright 2021 LiAuto authors.
+ * @yangchunxin
+ */
+
 package fusionstore
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -236,6 +242,8 @@ func (s *Store) DeleteBucket(ctx context.Context, bucket string, opts minio.Dele
 
 // ListObjects lists all blobs in S3 bucket filtered by prefix
 func (s *Store) ListObjects(ctx context.Context, bucket string, prefix string, marker string, delimiter string, maxKeys int) (loi minio.ListObjectsInfo, e error) {
+	fmt.Printf("Func:ListObjects, Bucket:%s, Prefix:%s, Marker:%s, Delimiter:%s, MaxKeys:%d\n",
+		bucket, prefix, marker, delimiter, maxKeys)
 	// Validate bucket name.
 	if err := s3utils.CheckValidBucketName(bucket); err != nil {
 		return minio.ListObjectsInfo{}, err

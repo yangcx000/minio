@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/minio/minio/fusionstore/mgs"
+	"github.com/minio/minio/fusionstore/utils"
 	"github.com/minio/minio/protos"
 )
 
@@ -72,6 +73,10 @@ func (m *Mgr) init() error {
 		}
 		m.MdsServices[v.ID] = svc
 		m.MdsMap[v.ID] = v
+	}
+	fmt.Println("/*--------------------------Mdss----------------------------*/")
+	for _, v := range m.MdsMap {
+		utils.PrettyPrint(v)
 	}
 	return nil
 }

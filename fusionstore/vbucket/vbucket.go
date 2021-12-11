@@ -18,7 +18,7 @@ import (
 	"github.com/minio/minio/protos"
 )
 
-const scanLimits = 100
+const scanLimits = 1000
 
 // VBucket xxx
 type VBucket struct {

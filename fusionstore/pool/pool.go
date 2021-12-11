@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/minio/minio/fusionstore/mgs"
+	"github.com/minio/minio/fusionstore/utils"
 	"github.com/minio/minio/protos"
 )
 
@@ -132,6 +133,11 @@ func (m *Mgr) init() error {
 	m.Pools = make(map[string]*Pool, len(pools))
 	for _, v := range pools {
 		m.Pools[v.ID] = v
+	}
+	fmt.Println("/*--------------------------Pools----------------------------*/")
+	// XXX(yangchunxin): log it
+	for _, v := range m.Pools {
+		utils.PrettyPrint(v)
 	}
 	return nil
 }
