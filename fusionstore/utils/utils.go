@@ -8,7 +8,13 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
+
+// GetCurrentTime xxx
+func GetCurrentTime() time.Time {
+	return time.Now()
+}
 
 // PrettyPrint xxx
 func PrettyPrint(v interface{}) {

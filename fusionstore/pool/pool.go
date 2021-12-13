@@ -104,8 +104,8 @@ func (p *Pool) ListBuckets() ([]*Bucket, error) {
 
 func (p *Pool) selectBucket() string {
 	// FIXME(yangchunxin): design algorithm
-	for key := range p.Buckets {
-		return key
+	for _, v := range p.Buckets {
+		return v.Name
 	}
 	return ""
 }

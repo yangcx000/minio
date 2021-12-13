@@ -15,6 +15,7 @@ import (
 	"github.com/minio/minio/fusionstore/mgs"
 	"github.com/minio/minio/fusionstore/object"
 	"github.com/minio/minio/fusionstore/pool"
+	"github.com/minio/minio/fusionstore/utils"
 	"github.com/minio/minio/protos"
 )
 
@@ -301,6 +302,7 @@ func (m *Mgr) listObjects(vbucket, marker string, numObjects int) ([]*object.Obj
 
 // PutObjectMeta xxx
 func (m *Mgr) PutObjectMeta(pID, pBucket string, objInfo minio.ObjectInfo) error {
+	timeNow := utils.GetCurrentTime()
 	obj := object.Object{
 		Name:            objInfo.Name,
 		VBucket:         objInfo.Bucket,
@@ -318,8 +320,8 @@ func (m *Mgr) PutObjectMeta(pID, pBucket string, objInfo minio.ObjectInfo) error
 		IsLatest:        objInfo.IsLatest,
 		DeleteMarker:    objInfo.DeleteMarker,
 		RestoreOngoing:  objInfo.RestoreOngoing,
-		ModTime:         objInfo.ModTime,
-		AccTime:         objInfo.AccTime,
+		ModTime:         timeNow,
+		AccTime:         timeNow,
 		Expires:         objInfo.Expires,
 		RestoreExpires:  objInfo.RestoreExpires,
 	}
@@ -389,6 +391,8 @@ func (m *Mgr) ListObjects(vbucket, prefix, marker, delimiter string, maxKeys int
 			RestoreExpires:  obj.RestoreExpires,
 		}
 		objInfos[i] = objInfo
+		// XXX(yangchunxin): remove
+		utils.PrettyPrint(obj)
 	}
 	return minio.ListObjectsInfo{
 		Objects:    objInfos,
@@ -403,4 +407,10 @@ func (m *Mgr) GetObjectPoolAndBucket(vbucket, object string) (pool, bucket strin
 		return "", ""
 	}
 	return obj.Pool, obj.Bucket
+}
+
+// GetObjectKey xxx
+func (m *Mgr) GetObjectKey(vbucket, object string) string {
+	// add vbucket prefix
+	return fmt.Sprintf("%s/%s", vbucket, object)
 }
