@@ -360,9 +360,6 @@ func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *
 	if len(pID) == 0 || len(pBucket) == 0 {
 		return objInfo, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
 	}
-	// XXX(yangchunxin): delete it
-	fmt.Printf("put %s/%s to %s/%s\n", bucket, object, pID, pBucket)
-
 	objectKey := s.VBucketMgr.GetObjectKey(bucket, object)
 	ui, err := s.Pools[pID].PutObject(ctx, pBucket, objectKey, data, data.Size(), data.MD5Base64String(), data.SHA256HexString(), putOpts)
 	if err != nil {

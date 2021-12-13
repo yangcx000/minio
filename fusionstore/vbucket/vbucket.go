@@ -391,8 +391,6 @@ func (m *Mgr) ListObjects(vbucket, prefix, marker, delimiter string, maxKeys int
 			RestoreExpires:  obj.RestoreExpires,
 		}
 		objInfos[i] = objInfo
-		// XXX(yangchunxin): remove
-		utils.PrettyPrint(obj)
 	}
 	return minio.ListObjectsInfo{
 		Objects:    objInfos,
