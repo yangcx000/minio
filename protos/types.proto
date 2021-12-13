@@ -36,12 +36,13 @@ message Pool {
   string id = 1;
   string name = 2;
   string type = 3;
-  string status = 4;
-  int32 version = 5;
-  string endpoint = 6;
-  Credentials creds = 7;
-  string created_time = 8;
-  string updated_time = 9;
+  string vendor = 4;
+  string status = 5;
+  int32 version = 6;
+  string endpoint = 7;
+  Credentials creds = 8;
+  string created_time = 9;
+  string updated_time = 10;
 }
 
 // bucket
