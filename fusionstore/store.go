@@ -278,7 +278,7 @@ func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *
 	// get pool and physical bucket name
 	pl, pBucket := s.VBucketMgr.GetPoolAndBucket(bucket, object)
 	if pl == nil || len(pBucket) == 0 {
-		return objInfo, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
+		return objInfo, minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
 	}
 	var client sdk.Client
 	switch pl.Vendor {

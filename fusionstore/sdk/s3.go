@@ -73,6 +73,9 @@ func newCore(endpoint string, creds madmin.Credentials, transport http.RoundTrip
 	if _, err = client.BucketExists(context.Background(), probeBucketName); err != nil {
 		switch miniogo.ToErrorResponse(err).Code {
 		case "AccessDenied":
+			// this is a good error means backend is reachable
+			// and credentials are valid but credentials don't
+			// have access to 'probeBucketName' which is harmless.
 			return &miniogo.Core{Client: client}, nil
 		default:
 			return nil, err
