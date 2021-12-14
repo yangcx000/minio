@@ -13,6 +13,14 @@ import (
 	"github.com/minio/minio/protos"
 )
 
+// vendors
+const (
+	VendorUnknown = "unknown"
+	VendorBaidu   = "bos"
+	VendorAws     = "s3"
+	VendorCeph    = "rgw"
+)
+
 // Bucket xxx
 type Bucket struct {
 	ID          string `json:"id,omitempty"`
@@ -46,6 +54,7 @@ type Pool struct {
 	ID          string             `json:"id,omitempty"`
 	Name        string             `json:"name"`
 	Type        string             `json:"type"`
+	Vendor      string             `json:"vendor"`
 	Status      string             `json:"status,omitempty"`
 	Version     int                `json:"version,omitempty"`
 	Endpoint    string             `json:"endpoint"`
@@ -60,6 +69,7 @@ func (p *Pool) DecodeFromPb(pool *protos.Pool) {
 	p.ID = pool.GetId()
 	p.Name = pool.GetName()
 	p.Type = pool.GetType()
+	p.Vendor = pool.GetVendor()
 	p.Status = pool.GetStatus()
 	p.Version = int(pool.GetVersion())
 	p.Endpoint = pool.GetEndpoint()
@@ -140,6 +150,11 @@ func (m *Mgr) init() error {
 		utils.PrettyPrint(v)
 	}
 	return nil
+}
+
+// GetPool xxx
+func (m *Mgr) GetPool(pool string) *Pool {
+	return m.Pools[pool]
 }
 
 // ListPools xxx

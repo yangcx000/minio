@@ -10,21 +10,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
-	"net/url"
-	"os"
-	"time"
 
 	"github.com/minio/madmin-go"
-	miniogo "github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/minio/minio-go/v7/pkg/s3utils"
 	"github.com/minio/minio-go/v7/pkg/tags"
 	minio "github.com/minio/minio/cmd"
 	"github.com/minio/minio/fusionstore/mgs"
+	"github.com/minio/minio/fusionstore/pool"
+	"github.com/minio/minio/fusionstore/sdk"
 	"github.com/minio/minio/fusionstore/vbucket"
-	xhttp "github.com/minio/minio/internal/http"
 	"github.com/minio/pkg/bucket/policy"
 )
 
@@ -32,36 +27,11 @@ const (
 	serviceTimeout = 10
 )
 
-const letterBytes = "abcdefghijklmnopqrstuvwxyz01234569"
-const (
-	letterIdxBits = 6                    // 6 bits to represent a letter index
-	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
-	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
-)
-
-// randString generates random names and prepends them with a known prefix.
-func randString(n int, src rand.Source, prefix string) string {
-	b := make([]byte, n)
-	// A rand.Int63() generates 63 random bits, enough for letterIdxMax letters!
-	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
-		if remain == 0 {
-			cache, remain = src.Int63(), letterIdxMax
-		}
-		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
-			b[i] = letterBytes[idx]
-			i--
-		}
-		cache >>= letterIdxBits
-		remain--
-	}
-	return prefix + string(b[0:30-len(prefix)])
-}
-
 // Store xxx
 type Store struct {
 	minio.GatewayUnsupported
-
-	Pools      map[string]*miniogo.Core
+	// vendor --> {pool_id --> client}
+	Pools      map[string]map[string]sdk.Client
 	VBucketMgr *vbucket.Mgr
 
 	HTTPClient *http.Client
@@ -105,58 +75,44 @@ func (s *Store) init(mgsAddr string, transport http.RoundTripper) error {
 }
 
 func (s *Store) initClients(transport http.RoundTripper) error {
-	s.Pools = make(map[string]*miniogo.Core)
+	s.Pools = make(map[string]map[string]sdk.Client)
 	for k, v := range s.VBucketMgr.PoolMgr.Pools {
-		cred := madmin.Credentials{
-			AccessKey: v.Creds.AccessKey,
-			SecretKey: v.Creds.SecretKey,
+		switch v.Vendor {
+		case pool.VendorAws:
+			_, exists := s.Pools[pool.VendorAws]
+			if !exists {
+				s.Pools[pool.VendorAws] = make(map[string]sdk.Client)
+			}
+			c, err := sdk.NewS3Client(v.Endpoint, v.Creds.AccessKey, v.Creds.SecretKey, transport)
+			if err != nil {
+				return err
+			}
+			s.Pools[pool.VendorAws][k] = c
+		case pool.VendorCeph:
+			_, exists := s.Pools[pool.VendorCeph]
+			if !exists {
+				s.Pools[pool.VendorCeph] = make(map[string]sdk.Client)
+			}
+			c, err := sdk.NewS3Client(v.Endpoint, v.Creds.AccessKey, v.Creds.SecretKey, transport)
+			if err != nil {
+				return err
+			}
+			s.Pools[pool.VendorCeph][k] = c
+		case pool.VendorBaidu:
+			_, exists := s.Pools[pool.VendorBaidu]
+			if !exists {
+				s.Pools[pool.VendorBaidu] = make(map[string]sdk.Client)
+			}
+			c, err := sdk.NewBosClient(v.Endpoint, v.Creds.AccessKey, v.Creds.SecretKey)
+			if err != nil {
+				return err
+			}
+			s.Pools[pool.VendorBaidu][k] = c
+		case pool.VendorUnknown:
+			// FIXME(yangchunxin): print error log
 		}
-		core, err := s.newCore(v.Endpoint, cred, transport)
-		if err != nil {
-			return err
-		}
-		s.Pools[k] = core
 	}
 	return nil
-}
-
-func (s *Store) newCore(endpoint string, creds madmin.Credentials, transport http.RoundTripper) (*miniogo.Core, error) {
-	if len(endpoint) == 0 {
-		return nil, errors.New("endpoint empty")
-	}
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return nil, err
-	}
-	// Override default params if the host is provided
-	endpoint, secure, err := minio.ParseGatewayEndpoint(endpoint)
-	if err != nil {
-		return nil, err
-	}
-	optionsStaticCreds := &miniogo.Options{
-		Creds:        credentials.NewStaticV4(creds.AccessKey, creds.SecretKey, creds.SessionToken),
-		Secure:       secure,
-		Region:       s3utils.GetRegionFromURL(*u),
-		BucketLookup: miniogo.BucketLookupAuto,
-		Transport:    transport,
-	}
-	client, err := miniogo.New(endpoint, optionsStaticCreds)
-	if err != nil {
-		return nil, err
-	}
-	if s.debug {
-		client.TraceOn(os.Stderr)
-	}
-	probeBucketName := randString(60, rand.NewSource(time.Now().UnixNano()), "probe-bucket-sign-")
-	if _, err = client.BucketExists(context.Background(), probeBucketName); err != nil {
-		switch miniogo.ToErrorResponse(err).Code {
-		case "AccessDenied":
-			return &miniogo.Core{Client: client}, nil
-		default:
-			return nil, err
-		}
-	}
-	return &miniogo.Core{Client: client}, nil
 }
 
 // GetMetrics returns this gateway's metrics
@@ -177,6 +133,8 @@ func (s *Store) StorageInfo(ctx context.Context) (si minio.StorageInfo, _ []erro
 	si.Backend.GatewayOnline = true
 	return si, nil
 }
+
+/*****************************************Bucket Operations***************************************/
 
 // MakeBucketWithLocation creates a new container on S3 backend.
 func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string, opts minio.BucketOptions) error {
@@ -240,10 +198,14 @@ func (s *Store) DeleteBucket(ctx context.Context, bucket string, opts minio.Dele
 	return nil
 }
 
+/*****************************************Object Operations***************************************/
+
 // ListObjects lists all blobs in S3 bucket filtered by prefix
 func (s *Store) ListObjects(ctx context.Context, bucket string, prefix string, marker string, delimiter string, maxKeys int) (loi minio.ListObjectsInfo, e error) {
+	// FIXME(yangchunxin): remove it
 	fmt.Printf("Func:ListObjects, Bucket:%s, Prefix:%s, Marker:%s, Delimiter:%s, MaxKeys:%d\n",
 		bucket, prefix, marker, delimiter, maxKeys)
+
 	// Validate bucket name.
 	if err := s3utils.CheckValidBucketName(bucket); err != nil {
 		return minio.ListObjectsInfo{}, err
@@ -271,58 +233,35 @@ func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *m
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-
 	fn, off, length, err := minio.NewGetObjectReader(rs, objInfo, opts)
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-
+	pl, pBucket := s.VBucketMgr.GetObjectPoolAndBucket(bucket, object)
+	if pl == nil || len(pBucket) == 0 {
+		return nil, minio.ErrorRespToObjectError(errors.New("object not found"), bucket, object)
+	}
+	var client sdk.Client
+	switch pl.Vendor {
+	case pool.VendorAws:
+		client = s.Pools[pool.VendorAws][pl.ID]
+	case pool.VendorCeph:
+		client = s.Pools[pool.VendorCeph][pl.ID]
+	case pool.VendorBaidu:
+		client = s.Pools[pool.VendorBaidu][pl.ID]
+	default:
+		return nil, minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	}
+	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
 	pr, pw := io.Pipe()
 	go func() {
-		err := s.getObject(ctx, bucket, object, off, length, pw, objInfo.ETag, opts)
+		err := client.GetObject(ctx, pBucket, pObject, bucket, object, off, length, pw, objInfo.ETag, opts)
 		pw.CloseWithError(err)
 	}()
-
 	// Setup cleanup function to cause the above go-routine to
 	// exit in case of partial read
 	pipeCloser := func() { pr.Close() }
 	return fn(pr, h, pipeCloser)
-}
-
-// GetObject reads an object from S3. Supports additional
-// parameters like offset and length which are synonymous with
-// HTTP Range requests.
-//
-// startOffset indicates the starting read location of the object.
-// length indicates the total length of the object.
-func (s *Store) getObject(ctx context.Context, bucket string, key string, startOffset int64, length int64, writer io.Writer, etag string, o minio.ObjectOptions) error {
-	if length < 0 && length != -1 {
-		return minio.ErrorRespToObjectError(minio.InvalidRange{}, bucket, key)
-	}
-	opts := miniogo.GetObjectOptions{}
-	opts.ServerSideEncryption = o.ServerSideEncryption
-	if startOffset >= 0 && length >= 0 {
-		if err := opts.SetRange(startOffset, startOffset+length-1); err != nil {
-			return minio.ErrorRespToObjectError(err, bucket, key)
-		}
-	}
-	if etag != "" {
-		opts.SetMatchETag(etag)
-	}
-	pID, pBucket := s.VBucketMgr.GetObjectPoolAndBucket(bucket, key)
-	if len(pID) == 0 || len(pBucket) == 0 {
-		return minio.ErrorRespToObjectError(errors.New("object not found"), bucket, key)
-	}
-	objectKey := s.VBucketMgr.GetObjectKey(bucket, key)
-	object, _, _, err := s.Pools[pID].GetObject(ctx, pBucket, objectKey, opts)
-	if err != nil {
-		return minio.ErrorRespToObjectError(err, bucket, key)
-	}
-	defer object.Close()
-	if _, err := io.Copy(writer, object); err != nil {
-		return minio.ErrorRespToObjectError(err, bucket, key)
-	}
-	return nil
 }
 
 // GetObjectInfo reads object info and replies back ObjectInfo
@@ -336,45 +275,29 @@ func (s *Store) GetObjectInfo(ctx context.Context, bucket string, object string,
 
 // PutObject creates a new object with the incoming data,
 func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *minio.PutObjReader, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	data := r.Reader
-	var tagMap map[string]string
-	if tagstr, ok := opts.UserDefined[xhttp.AmzObjectTagging]; ok && tagstr != "" {
-		tagObj, err := tags.ParseObjectTags(tagstr)
-		if err != nil {
-			return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
-		}
-		tagMap = tagObj.ToMap()
-		delete(opts.UserDefined, xhttp.AmzObjectTagging)
-	}
-	putOpts := miniogo.PutObjectOptions{
-		UserMetadata:         opts.UserDefined,
-		ServerSideEncryption: opts.ServerSideEncryption,
-		UserTags:             tagMap,
-		// Content-Md5 is needed for buckets with object locking,
-		// instead of spending an extra API call to detect this
-		// we can set md5sum to be calculated always.
-		SendContentMd5: true,
-	}
-	// get pool id and bucket name
-	pID, pBucket := s.VBucketMgr.GetPoolAndBucket(bucket, object)
-	if len(pID) == 0 || len(pBucket) == 0 {
+	// get pool and physical bucket name
+	pl, pBucket := s.VBucketMgr.GetPoolAndBucket(bucket, object)
+	if pl == nil || len(pBucket) == 0 {
 		return objInfo, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
 	}
-	objectKey := s.VBucketMgr.GetObjectKey(bucket, object)
-	ui, err := s.Pools[pID].PutObject(ctx, pBucket, objectKey, data, data.Size(), data.MD5Base64String(), data.SHA256HexString(), putOpts)
+	var client sdk.Client
+	switch pl.Vendor {
+	case pool.VendorAws:
+		client = s.Pools[pool.VendorAws][pl.ID]
+	case pool.VendorCeph:
+		client = s.Pools[pool.VendorCeph][pl.ID]
+	case pool.VendorBaidu:
+		client = s.Pools[pool.VendorBaidu][pl.ID]
+	default:
+		return objInfo, minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	}
+	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
+	objInfo, err = client.PutObject(ctx, pBucket, pObject, bucket, object, r, opts)
 	if err != nil {
 		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	// On success, populate the key & metadata so they are present in the notification
-	oi := miniogo.ObjectInfo{
-		ETag:     ui.ETag,
-		Size:     ui.Size,
-		Key:      object,
-		Metadata: minio.ToMinioClientObjectInfoMetadata(opts.UserDefined),
-	}
-	objInfo = minio.FromMinioClientObjectInfo(bucket, oi)
 	// insert object meta
-	err = s.VBucketMgr.PutObjectMeta(pID, pBucket, objInfo)
+	err = s.VBucketMgr.PutObjectMeta(pl.ID, pBucket, objInfo)
 	if err != nil {
 		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
 	}
@@ -416,20 +339,31 @@ func (s *Store) CopyObject(ctx context.Context, srcBucket string, srcObject stri
 
 // DeleteObject deletes a blob in bucket
 func (s *Store) DeleteObject(ctx context.Context, bucket string, object string, opts minio.ObjectOptions) (minio.ObjectInfo, error) {
-	pID, pBucket := s.VBucketMgr.GetObjectPoolAndBucket(bucket, object)
-	err := s.Pools[pID].RemoveObject(ctx, pBucket, object, miniogo.RemoveObjectOptions{})
-	if err != nil {
-		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
+	pl, pBucket := s.VBucketMgr.GetObjectPoolAndBucket(bucket, object)
+	if pl == nil || len(pBucket) == 0 {
+		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
 	}
-	objInfo := minio.ObjectInfo{
-		Bucket: bucket,
-		Name:   object,
+	var client sdk.Client
+	switch pl.Vendor {
+	case pool.VendorAws:
+		client = s.Pools[pool.VendorAws][pl.ID]
+	case pool.VendorCeph:
+		client = s.Pools[pool.VendorCeph][pl.ID]
+	case pool.VendorBaidu:
+		client = s.Pools[pool.VendorBaidu][pl.ID]
+	default:
+		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	}
+	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
+	oi, err := client.DeleteObject(ctx, pBucket, pObject, bucket, object, opts)
+	if err != nil {
+		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
 	err = s.VBucketMgr.DeleteObjectMeta(bucket, object)
 	if err != nil {
-		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
+		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	return objInfo, nil
+	return oi, nil
 }
 
 // DeleteObjects xxx
