@@ -178,13 +178,20 @@ func (m *Mgr) ListPools() ([]*Pool, error) {
 	return pools, nil
 }
 
+var poolIndex int
+
 // SelectPool xxx
 func (m *Mgr) SelectPool(vbucket string) string {
 	// XXX: design algorithm
+	poolIDs := make([]string, len(m.Pools))
+	i := 0
 	for k := range m.Pools {
-		return k
+		poolIDs[i] = k
+		i++
 	}
-	return ""
+	c := poolIndex % len(poolIDs)
+	poolIndex++
+	return poolIDs[c]
 }
 
 // SelectBucket xxx
