@@ -13,6 +13,7 @@ import (
 	minio "github.com/minio/minio/cmd"
 	"github.com/minio/minio/fusionstore/mds"
 	"github.com/minio/minio/fusionstore/mgs"
+	"github.com/minio/minio/fusionstore/multipart"
 	"github.com/minio/minio/fusionstore/object"
 	"github.com/minio/minio/fusionstore/pool"
 	"github.com/minio/minio/fusionstore/utils"
@@ -297,6 +298,82 @@ func (m *Mgr) listObjects(vbucket, marker string, numObjects int) ([]*object.Obj
 	}
 	nextMarker = resp.GetNext()
 	return objs, nextMarker, nil
+}
+
+// multipart apis
+func (m *Mgr) createMultipart(mp *multipart.Multipart) (string, error) {
+	// FIXME(yangchunxin): multi clients upload the same object by multipart ??
+	vb := m.getVBucket(mp.VBucket)
+	srv := m.MdsMgr.GetService(vb.Mds)
+	resp, err := srv.CreateMultipart(mp)
+	if err != nil {
+		return "", err
+	}
+	if resp.GetStatus().Code != protos.Code_OK {
+		return "", fmt.Errorf("%s", resp.GetStatus().GetMsg())
+	}
+	return resp.GetUploadId(), nil
+}
+
+func (m *Mgr) getMultipart(vbucket, uploadID string) (*multipart.Multipart, error) {
+	vb := m.getVBucket(vbucket)
+	srv := m.MdsMgr.GetService(vb.Mds)
+	resp, err := srv.QueryMultipart(vbucket, uploadID)
+	if err != nil {
+		return nil, err
+	}
+	if resp.GetStatus().Code != protos.Code_OK {
+		if resp.GetStatus().Code == protos.Code_NOT_FOUND {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
+	}
+	mp := &multipart.Multipart{}
+	mp.DecodeFromPb(resp.GetMultipart())
+	return mp, nil
+}
+
+func (m *Mgr) deleteMultipart(vbucket, uploadID string) error {
+	vb := m.getVBucket(vbucket)
+	srv := m.MdsMgr.GetService(vb.Mds)
+	resp, err := srv.DeleteMultipart(vbucket, uploadID)
+	if err != nil {
+		return err
+	}
+	if resp.GetStatus().Code != protos.Code_OK {
+		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
+	}
+	return nil
+}
+
+func (m *Mgr) listMultiparts(vbucket, marker string, numMultiparts int) ([]*multipart.Multipart, string, error) {
+	nextMarker := ""
+	vb := m.getVBucket(vbucket)
+	if vb == nil {
+		return nil, nextMarker, errors.New("couldn't get vbucket")
+	}
+	srv := m.MdsMgr.GetService(vb.Mds)
+	if srv == nil {
+		return nil, nextMarker, errors.New("couldn't get mds service")
+	}
+	if numMultiparts > scanLimits {
+		return nil, nextMarker, fmt.Errorf("multipart limits must less than %d", scanLimits)
+	}
+	resp, err := srv.ListMultiparts(vbucket, marker, int32(numMultiparts))
+	if err != nil {
+		return nil, nextMarker, err
+	}
+	if resp.GetStatus().Code != protos.Code_OK {
+		return nil, nextMarker, fmt.Errorf("%s", resp.GetStatus().GetMsg())
+	}
+	mps := make([]*multipart.Multipart, len(resp.GetMultiparts()))
+	for i, v := range resp.GetMultiparts() {
+		mp := &multipart.Multipart{}
+		mp.DecodeFromPb(v)
+		mps[i] = mp
+	}
+	nextMarker = resp.GetNext()
+	return mps, nextMarker, nil
 }
 
 // PutObjectMeta xxx

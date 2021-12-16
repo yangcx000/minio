@@ -460,6 +460,565 @@ func (x *ListObjectsResponse) GetObjects() []*Object {
 	return nil
 }
 
+type ListAllObjectsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Prev   string `protobuf:"bytes,1,opt,name=prev,proto3" json:"prev,omitempty"`
+	Limits int32  `protobuf:"varint,2,opt,name=limits,proto3" json:"limits,omitempty"`
+}
+
+func (x *ListAllObjectsRequest) Reset() {
+	*x = ListAllObjectsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_mds_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ListAllObjectsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAllObjectsRequest) ProtoMessage() {}
+
+func (x *ListAllObjectsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mds_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAllObjectsRequest.ProtoReflect.Descriptor instead.
+func (*ListAllObjectsRequest) Descriptor() ([]byte, []int) {
+	return file_mds_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ListAllObjectsRequest) GetPrev() string {
+	if x != nil {
+		return x.Prev
+	}
+	return ""
+}
+
+func (x *ListAllObjectsRequest) GetLimits() int32 {
+	if x != nil {
+		return x.Limits
+	}
+	return 0
+}
+
+type ListAllObjectsResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Status  *Status   `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Next    string    `protobuf:"bytes,2,opt,name=next,proto3" json:"next,omitempty"`
+	Objects []*Object `protobuf:"bytes,3,rep,name=objects,proto3" json:"objects,omitempty"`
+}
+
+func (x *ListAllObjectsResponse) Reset() {
+	*x = ListAllObjectsResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_mds_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ListAllObjectsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAllObjectsResponse) ProtoMessage() {}
+
+func (x *ListAllObjectsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mds_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAllObjectsResponse.ProtoReflect.Descriptor instead.
+func (*ListAllObjectsResponse) Descriptor() ([]byte, []int) {
+	return file_mds_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListAllObjectsResponse) GetStatus() *Status {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *ListAllObjectsResponse) GetNext() string {
+	if x != nil {
+		return x.Next
+	}
+	return ""
+}
+
+func (x *ListAllObjectsResponse) GetObjects() []*Object {
+	if x != nil {
+		return x.Objects
+	}
+	return nil
+}
+
+// multipart apis
+type CreateMultipartRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Multipart *Multipart `protobuf:"bytes,1,opt,name=multipart,proto3" json:"multipart,omitempty"`
+}
+
+func (x *CreateMultipartRequest) Reset() {
+	*x = CreateMultipartRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_mds_proto_msgTypes[10]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CreateMultipartRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateMultipartRequest) ProtoMessage() {}
+
+func (x *CreateMultipartRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mds_proto_msgTypes[10]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateMultipartRequest.ProtoReflect.Descriptor instead.
+func (*CreateMultipartRequest) Descriptor() ([]byte, []int) {
+	return file_mds_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *CreateMultipartRequest) GetMultipart() *Multipart {
+	if x != nil {
+		return x.Multipart
+	}
+	return nil
+}
+
+type CreateMultipartResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Status   *Status `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	UploadId string  `protobuf:"bytes,2,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
+}
+
+func (x *CreateMultipartResponse) Reset() {
+	*x = CreateMultipartResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_mds_proto_msgTypes[11]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CreateMultipartResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateMultipartResponse) ProtoMessage() {}
+
+func (x *CreateMultipartResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mds_proto_msgTypes[11]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateMultipartResponse.ProtoReflect.Descriptor instead.
+func (*CreateMultipartResponse) Descriptor() ([]byte, []int) {
+	return file_mds_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *CreateMultipartResponse) GetStatus() *Status {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *CreateMultipartResponse) GetUploadId() string {
+	if x != nil {
+		return x.UploadId
+	}
+	return ""
+}
+
+type DeleteMultipartRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Vbucket  string `protobuf:"bytes,1,opt,name=vbucket,proto3" json:"vbucket,omitempty"`
+	UploadId string `protobuf:"bytes,2,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
+}
+
+func (x *DeleteMultipartRequest) Reset() {
+	*x = DeleteMultipartRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_mds_proto_msgTypes[12]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DeleteMultipartRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteMultipartRequest) ProtoMessage() {}
+
+func (x *DeleteMultipartRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mds_proto_msgTypes[12]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteMultipartRequest.ProtoReflect.Descriptor instead.
+func (*DeleteMultipartRequest) Descriptor() ([]byte, []int) {
+	return file_mds_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *DeleteMultipartRequest) GetVbucket() string {
+	if x != nil {
+		return x.Vbucket
+	}
+	return ""
+}
+
+func (x *DeleteMultipartRequest) GetUploadId() string {
+	if x != nil {
+		return x.UploadId
+	}
+	return ""
+}
+
+type DeleteMultipartResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Status *Status `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+}
+
+func (x *DeleteMultipartResponse) Reset() {
+	*x = DeleteMultipartResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_mds_proto_msgTypes[13]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DeleteMultipartResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteMultipartResponse) ProtoMessage() {}
+
+func (x *DeleteMultipartResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mds_proto_msgTypes[13]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteMultipartResponse.ProtoReflect.Descriptor instead.
+func (*DeleteMultipartResponse) Descriptor() ([]byte, []int) {
+	return file_mds_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *DeleteMultipartResponse) GetStatus() *Status {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+type QueryMultipartRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Vbucket  string `protobuf:"bytes,1,opt,name=vbucket,proto3" json:"vbucket,omitempty"`
+	UploadId string `protobuf:"bytes,2,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
+}
+
+func (x *QueryMultipartRequest) Reset() {
+	*x = QueryMultipartRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_mds_proto_msgTypes[14]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *QueryMultipartRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueryMultipartRequest) ProtoMessage() {}
+
+func (x *QueryMultipartRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mds_proto_msgTypes[14]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueryMultipartRequest.ProtoReflect.Descriptor instead.
+func (*QueryMultipartRequest) Descriptor() ([]byte, []int) {
+	return file_mds_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *QueryMultipartRequest) GetVbucket() string {
+	if x != nil {
+		return x.Vbucket
+	}
+	return ""
+}
+
+func (x *QueryMultipartRequest) GetUploadId() string {
+	if x != nil {
+		return x.UploadId
+	}
+	return ""
+}
+
+type QueryMultipartResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Status    *Status    `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Multipart *Multipart `protobuf:"bytes,2,opt,name=multipart,proto3" json:"multipart,omitempty"`
+}
+
+func (x *QueryMultipartResponse) Reset() {
+	*x = QueryMultipartResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_mds_proto_msgTypes[15]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *QueryMultipartResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueryMultipartResponse) ProtoMessage() {}
+
+func (x *QueryMultipartResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mds_proto_msgTypes[15]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueryMultipartResponse.ProtoReflect.Descriptor instead.
+func (*QueryMultipartResponse) Descriptor() ([]byte, []int) {
+	return file_mds_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *QueryMultipartResponse) GetStatus() *Status {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *QueryMultipartResponse) GetMultipart() *Multipart {
+	if x != nil {
+		return x.Multipart
+	}
+	return nil
+}
+
+type ListMultipartsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Vbucket string `protobuf:"bytes,1,opt,name=vbucket,proto3" json:"vbucket,omitempty"`
+	Prev    string `protobuf:"bytes,2,opt,name=prev,proto3" json:"prev,omitempty"`
+	Limits  int32  `protobuf:"varint,3,opt,name=limits,proto3" json:"limits,omitempty"`
+}
+
+func (x *ListMultipartsRequest) Reset() {
+	*x = ListMultipartsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_mds_proto_msgTypes[16]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ListMultipartsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMultipartsRequest) ProtoMessage() {}
+
+func (x *ListMultipartsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mds_proto_msgTypes[16]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMultipartsRequest.ProtoReflect.Descriptor instead.
+func (*ListMultipartsRequest) Descriptor() ([]byte, []int) {
+	return file_mds_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ListMultipartsRequest) GetVbucket() string {
+	if x != nil {
+		return x.Vbucket
+	}
+	return ""
+}
+
+func (x *ListMultipartsRequest) GetPrev() string {
+	if x != nil {
+		return x.Prev
+	}
+	return ""
+}
+
+func (x *ListMultipartsRequest) GetLimits() int32 {
+	if x != nil {
+		return x.Limits
+	}
+	return 0
+}
+
+type ListMultipartsResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Status     *Status      `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Next       string       `protobuf:"bytes,2,opt,name=next,proto3" json:"next,omitempty"`
+	Multiparts []*Multipart `protobuf:"bytes,3,rep,name=multiparts,proto3" json:"multiparts,omitempty"`
+}
+
+func (x *ListMultipartsResponse) Reset() {
+	*x = ListMultipartsResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_mds_proto_msgTypes[17]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ListMultipartsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMultipartsResponse) ProtoMessage() {}
+
+func (x *ListMultipartsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mds_proto_msgTypes[17]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMultipartsResponse.ProtoReflect.Descriptor instead.
+func (*ListMultipartsResponse) Descriptor() ([]byte, []int) {
+	return file_mds_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ListMultipartsResponse) GetStatus() *Status {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *ListMultipartsResponse) GetNext() string {
+	if x != nil {
+		return x.Next
+	}
+	return ""
+}
+
+func (x *ListMultipartsResponse) GetMultiparts() []*Multipart {
+	if x != nil {
+		return x.Multiparts
+	}
+	return nil
+}
+
 var File_mds_proto protoreflect.FileDescriptor
 
 var file_mds_proto_rawDesc = []byte{
@@ -506,7 +1065,66 @@ var file_mds_proto_rawDesc = []byte{
 	0x78, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x65, 0x78, 0x74, 0x12, 0x28,
 	0x0a, 0x07, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0b, 0x32,
 	0x0e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x52,
-	0x07, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x32, 0xb1, 0x02, 0x0a, 0x0a, 0x4d, 0x64, 0x73,
+	0x07, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x22, 0x43, 0x0a, 0x15, 0x4c, 0x69, 0x73, 0x74,
+	0x41, 0x6c, 0x6c, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x74, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x72, 0x65, 0x76, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x04, 0x70, 0x72, 0x65, 0x76, 0x12, 0x16, 0x0a, 0x06, 0x6c, 0x69, 0x6d, 0x69, 0x74, 0x73, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x6c, 0x69, 0x6d, 0x69, 0x74, 0x73, 0x22, 0x7e, 0x0a,
+	0x16, 0x4c, 0x69, 0x73, 0x74, 0x41, 0x6c, 0x6c, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x52,
+	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x26, 0x0a, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75,
+	0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73,
+	0x2e, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12,
+	0x12, 0x0a, 0x04, 0x6e, 0x65, 0x78, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e,
+	0x65, 0x78, 0x74, 0x12, 0x28, 0x0a, 0x07, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x18, 0x03,
+	0x20, 0x03, 0x28, 0x0b, 0x32, 0x0e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x4f, 0x62,
+	0x6a, 0x65, 0x63, 0x74, 0x52, 0x07, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x22, 0x49, 0x0a,
+	0x16, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74,
+	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x2f, 0x0a, 0x09, 0x6d, 0x75, 0x6c, 0x74, 0x69,
+	0x70, 0x61, 0x72, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x73, 0x2e, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x52, 0x09, 0x6d,
+	0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x22, 0x5e, 0x0a, 0x17, 0x43, 0x72, 0x65, 0x61,
+	0x74, 0x65, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f,
+	0x6e, 0x73, 0x65, 0x12, 0x26, 0x0a, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x0b, 0x32, 0x0e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x53, 0x74, 0x61,
+	0x74, 0x75, 0x73, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x1b, 0x0a, 0x09, 0x75,
+	0x70, 0x6c, 0x6f, 0x61, 0x64, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08,
+	0x75, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x49, 0x64, 0x22, 0x4f, 0x0a, 0x16, 0x44, 0x65, 0x6c, 0x65,
+	0x74, 0x65, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x76, 0x62, 0x75, 0x63, 0x6b, 0x65, 0x74, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x07, 0x76, 0x62, 0x75, 0x63, 0x6b, 0x65, 0x74, 0x12, 0x1b, 0x0a, 0x09,
+	0x75, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x08, 0x75, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x49, 0x64, 0x22, 0x41, 0x0a, 0x17, 0x44, 0x65, 0x6c,
+	0x65, 0x74, 0x65, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x12, 0x26, 0x0a, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x0b, 0x32, 0x0e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x53, 0x74,
+	0x61, 0x74, 0x75, 0x73, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x22, 0x4e, 0x0a, 0x15,
+	0x51, 0x75, 0x65, 0x72, 0x79, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x52, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x76, 0x62, 0x75, 0x63, 0x6b, 0x65, 0x74,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x76, 0x62, 0x75, 0x63, 0x6b, 0x65, 0x74, 0x12,
+	0x1b, 0x0a, 0x09, 0x75, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x08, 0x75, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x49, 0x64, 0x22, 0x71, 0x0a, 0x16,
+	0x51, 0x75, 0x65, 0x72, 0x79, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x52, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x26, 0x0a, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e,
+	0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x2f,
+	0x0a, 0x09, 0x6d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x0b, 0x32, 0x11, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x4d, 0x75, 0x6c, 0x74, 0x69,
+	0x70, 0x61, 0x72, 0x74, 0x52, 0x09, 0x6d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x22,
+	0x5d, 0x0a, 0x15, 0x4c, 0x69, 0x73, 0x74, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74,
+	0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x76, 0x62, 0x75, 0x63,
+	0x6b, 0x65, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x76, 0x62, 0x75, 0x63, 0x6b,
+	0x65, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x72, 0x65, 0x76, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x04, 0x70, 0x72, 0x65, 0x76, 0x12, 0x16, 0x0a, 0x06, 0x6c, 0x69, 0x6d, 0x69, 0x74, 0x73,
+	0x18, 0x03, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x6c, 0x69, 0x6d, 0x69, 0x74, 0x73, 0x22, 0x87,
+	0x01, 0x0a, 0x16, 0x4c, 0x69, 0x73, 0x74, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74,
+	0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x26, 0x0a, 0x06, 0x73, 0x74, 0x61,
+	0x74, 0x75, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0e, 0x2e, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x73, 0x2e, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75,
+	0x73, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x65, 0x78, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x04, 0x6e, 0x65, 0x78, 0x74, 0x12, 0x31, 0x0a, 0x0a, 0x6d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61,
+	0x72, 0x74, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x73, 0x2e, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x52, 0x0a, 0x6d, 0x75,
+	0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x73, 0x32, 0xd6, 0x05, 0x0a, 0x0a, 0x4d, 0x64, 0x73,
 	0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x42, 0x0a, 0x09, 0x50, 0x75, 0x74, 0x4f, 0x62,
 	0x6a, 0x65, 0x63, 0x74, 0x12, 0x18, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x50, 0x75,
 	0x74, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x19,
@@ -525,9 +1143,36 @@ var file_mds_proto_rawDesc = []byte{
 	0x73, 0x12, 0x1a, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x4c, 0x69, 0x73, 0x74, 0x4f,
 	0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1b, 0x2e,
 	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x4c, 0x69, 0x73, 0x74, 0x4f, 0x62, 0x6a, 0x65, 0x63,
-	0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x42, 0x18, 0x5a, 0x16,
-	0x6c, 0x69, 0x78, 0x69, 0x61, 0x6e, 0x67, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x72, 0x70, 0x63, 0x2f,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x51, 0x0a, 0x0e,
+	0x4c, 0x69, 0x73, 0x74, 0x41, 0x6c, 0x6c, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x12, 0x1d,
+	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x4c, 0x69, 0x73, 0x74, 0x41, 0x6c, 0x6c, 0x4f,
+	0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1e, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x4c, 0x69, 0x73, 0x74, 0x41, 0x6c, 0x6c, 0x4f, 0x62,
+	0x6a, 0x65, 0x63, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12,
+	0x54, 0x0a, 0x0f, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61,
+	0x72, 0x74, 0x12, 0x1e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x43, 0x72, 0x65, 0x61,
+	0x74, 0x65, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x1a, 0x1f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x43, 0x72, 0x65, 0x61,
+	0x74, 0x65, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f,
+	0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x54, 0x0a, 0x0f, 0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x4d,
+	0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x12, 0x1e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x73, 0x2e, 0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72,
+	0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x73, 0x2e, 0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72,
+	0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x51, 0x0a, 0x0e, 0x51,
+	0x75, 0x65, 0x72, 0x79, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x12, 0x1d, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x51, 0x75, 0x65, 0x72, 0x79, 0x4d, 0x75, 0x6c, 0x74,
+	0x69, 0x70, 0x61, 0x72, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1e, 0x2e, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x51, 0x75, 0x65, 0x72, 0x79, 0x4d, 0x75, 0x6c, 0x74, 0x69,
+	0x70, 0x61, 0x72, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x51,
+	0x0a, 0x0e, 0x4c, 0x69, 0x73, 0x74, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x73,
+	0x12, 0x1d, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x4c, 0x69, 0x73, 0x74, 0x4d, 0x75,
+	0x6c, 0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a,
+	0x1e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x4c, 0x69, 0x73, 0x74, 0x4d, 0x75, 0x6c,
+	0x74, 0x69, 0x70, 0x61, 0x72, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22,
+	0x00, 0x42, 0x18, 0x5a, 0x16, 0x6c, 0x69, 0x78, 0x69, 0x61, 0x6e, 0x67, 0x2e, 0x63, 0x6f, 0x6d,
+	0x2f, 0x72, 0x70, 0x63, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x33,
 }
 
 var (
@@ -542,40 +1187,70 @@ func file_mds_proto_rawDescGZIP() []byte {
 	return file_mds_proto_rawDescData
 }
 
-var file_mds_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_mds_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_mds_proto_goTypes = []interface{}{
-	(*PutObjectRequest)(nil),     // 0: protos.PutObjectRequest
-	(*PutObjectResponse)(nil),    // 1: protos.PutObjectResponse
-	(*DeleteObjectRequest)(nil),  // 2: protos.DeleteObjectRequest
-	(*DeleteObjectResponse)(nil), // 3: protos.DeleteObjectResponse
-	(*QueryObjectRequest)(nil),   // 4: protos.QueryObjectRequest
-	(*QueryObjectResponse)(nil),  // 5: protos.QueryObjectResponse
-	(*ListObjectsRequest)(nil),   // 6: protos.ListObjectsRequest
-	(*ListObjectsResponse)(nil),  // 7: protos.ListObjectsResponse
-	(*Object)(nil),               // 8: protos.Object
-	(*Status)(nil),               // 9: protos.Status
+	(*PutObjectRequest)(nil),        // 0: protos.PutObjectRequest
+	(*PutObjectResponse)(nil),       // 1: protos.PutObjectResponse
+	(*DeleteObjectRequest)(nil),     // 2: protos.DeleteObjectRequest
+	(*DeleteObjectResponse)(nil),    // 3: protos.DeleteObjectResponse
+	(*QueryObjectRequest)(nil),      // 4: protos.QueryObjectRequest
+	(*QueryObjectResponse)(nil),     // 5: protos.QueryObjectResponse
+	(*ListObjectsRequest)(nil),      // 6: protos.ListObjectsRequest
+	(*ListObjectsResponse)(nil),     // 7: protos.ListObjectsResponse
+	(*ListAllObjectsRequest)(nil),   // 8: protos.ListAllObjectsRequest
+	(*ListAllObjectsResponse)(nil),  // 9: protos.ListAllObjectsResponse
+	(*CreateMultipartRequest)(nil),  // 10: protos.CreateMultipartRequest
+	(*CreateMultipartResponse)(nil), // 11: protos.CreateMultipartResponse
+	(*DeleteMultipartRequest)(nil),  // 12: protos.DeleteMultipartRequest
+	(*DeleteMultipartResponse)(nil), // 13: protos.DeleteMultipartResponse
+	(*QueryMultipartRequest)(nil),   // 14: protos.QueryMultipartRequest
+	(*QueryMultipartResponse)(nil),  // 15: protos.QueryMultipartResponse
+	(*ListMultipartsRequest)(nil),   // 16: protos.ListMultipartsRequest
+	(*ListMultipartsResponse)(nil),  // 17: protos.ListMultipartsResponse
+	(*Object)(nil),                  // 18: protos.Object
+	(*Status)(nil),                  // 19: protos.Status
+	(*Multipart)(nil),               // 20: protos.Multipart
 }
 var file_mds_proto_depIdxs = []int32{
-	8,  // 0: protos.PutObjectRequest.object:type_name -> protos.Object
-	9,  // 1: protos.PutObjectResponse.status:type_name -> protos.Status
-	9,  // 2: protos.DeleteObjectResponse.status:type_name -> protos.Status
-	9,  // 3: protos.QueryObjectResponse.status:type_name -> protos.Status
-	8,  // 4: protos.QueryObjectResponse.object:type_name -> protos.Object
-	9,  // 5: protos.ListObjectsResponse.status:type_name -> protos.Status
-	8,  // 6: protos.ListObjectsResponse.objects:type_name -> protos.Object
-	0,  // 7: protos.MdsService.PutObject:input_type -> protos.PutObjectRequest
-	2,  // 8: protos.MdsService.DeleteObject:input_type -> protos.DeleteObjectRequest
-	4,  // 9: protos.MdsService.QueryObject:input_type -> protos.QueryObjectRequest
-	6,  // 10: protos.MdsService.ListObjects:input_type -> protos.ListObjectsRequest
-	1,  // 11: protos.MdsService.PutObject:output_type -> protos.PutObjectResponse
-	3,  // 12: protos.MdsService.DeleteObject:output_type -> protos.DeleteObjectResponse
-	5,  // 13: protos.MdsService.QueryObject:output_type -> protos.QueryObjectResponse
-	7,  // 14: protos.MdsService.ListObjects:output_type -> protos.ListObjectsResponse
-	11, // [11:15] is the sub-list for method output_type
-	7,  // [7:11] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	18, // 0: protos.PutObjectRequest.object:type_name -> protos.Object
+	19, // 1: protos.PutObjectResponse.status:type_name -> protos.Status
+	19, // 2: protos.DeleteObjectResponse.status:type_name -> protos.Status
+	19, // 3: protos.QueryObjectResponse.status:type_name -> protos.Status
+	18, // 4: protos.QueryObjectResponse.object:type_name -> protos.Object
+	19, // 5: protos.ListObjectsResponse.status:type_name -> protos.Status
+	18, // 6: protos.ListObjectsResponse.objects:type_name -> protos.Object
+	19, // 7: protos.ListAllObjectsResponse.status:type_name -> protos.Status
+	18, // 8: protos.ListAllObjectsResponse.objects:type_name -> protos.Object
+	20, // 9: protos.CreateMultipartRequest.multipart:type_name -> protos.Multipart
+	19, // 10: protos.CreateMultipartResponse.status:type_name -> protos.Status
+	19, // 11: protos.DeleteMultipartResponse.status:type_name -> protos.Status
+	19, // 12: protos.QueryMultipartResponse.status:type_name -> protos.Status
+	20, // 13: protos.QueryMultipartResponse.multipart:type_name -> protos.Multipart
+	19, // 14: protos.ListMultipartsResponse.status:type_name -> protos.Status
+	20, // 15: protos.ListMultipartsResponse.multiparts:type_name -> protos.Multipart
+	0,  // 16: protos.MdsService.PutObject:input_type -> protos.PutObjectRequest
+	2,  // 17: protos.MdsService.DeleteObject:input_type -> protos.DeleteObjectRequest
+	4,  // 18: protos.MdsService.QueryObject:input_type -> protos.QueryObjectRequest
+	6,  // 19: protos.MdsService.ListObjects:input_type -> protos.ListObjectsRequest
+	8,  // 20: protos.MdsService.ListAllObjects:input_type -> protos.ListAllObjectsRequest
+	10, // 21: protos.MdsService.CreateMultipart:input_type -> protos.CreateMultipartRequest
+	12, // 22: protos.MdsService.DeleteMultipart:input_type -> protos.DeleteMultipartRequest
+	14, // 23: protos.MdsService.QueryMultipart:input_type -> protos.QueryMultipartRequest
+	16, // 24: protos.MdsService.ListMultiparts:input_type -> protos.ListMultipartsRequest
+	1,  // 25: protos.MdsService.PutObject:output_type -> protos.PutObjectResponse
+	3,  // 26: protos.MdsService.DeleteObject:output_type -> protos.DeleteObjectResponse
+	5,  // 27: protos.MdsService.QueryObject:output_type -> protos.QueryObjectResponse
+	7,  // 28: protos.MdsService.ListObjects:output_type -> protos.ListObjectsResponse
+	9,  // 29: protos.MdsService.ListAllObjects:output_type -> protos.ListAllObjectsResponse
+	11, // 30: protos.MdsService.CreateMultipart:output_type -> protos.CreateMultipartResponse
+	13, // 31: protos.MdsService.DeleteMultipart:output_type -> protos.DeleteMultipartResponse
+	15, // 32: protos.MdsService.QueryMultipart:output_type -> protos.QueryMultipartResponse
+	17, // 33: protos.MdsService.ListMultiparts:output_type -> protos.ListMultipartsResponse
+	25, // [25:34] is the sub-list for method output_type
+	16, // [16:25] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_mds_proto_init() }
@@ -682,6 +1357,126 @@ func file_mds_proto_init() {
 				return nil
 			}
 		}
+		file_mds_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ListAllObjectsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_mds_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ListAllObjectsResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_mds_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CreateMultipartRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_mds_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CreateMultipartResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_mds_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DeleteMultipartRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_mds_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DeleteMultipartResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_mds_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*QueryMultipartRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_mds_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*QueryMultipartResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_mds_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ListMultipartsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_mds_proto_msgTypes[17].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ListMultipartsResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -689,7 +1484,7 @@ func file_mds_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_mds_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
@@ -720,6 +1515,12 @@ type MdsServiceClient interface {
 	DeleteObject(ctx context.Context, in *DeleteObjectRequest, opts ...grpc.CallOption) (*DeleteObjectResponse, error)
 	QueryObject(ctx context.Context, in *QueryObjectRequest, opts ...grpc.CallOption) (*QueryObjectResponse, error)
 	ListObjects(ctx context.Context, in *ListObjectsRequest, opts ...grpc.CallOption) (*ListObjectsResponse, error)
+	ListAllObjects(ctx context.Context, in *ListAllObjectsRequest, opts ...grpc.CallOption) (*ListAllObjectsResponse, error)
+	// multipart operations
+	CreateMultipart(ctx context.Context, in *CreateMultipartRequest, opts ...grpc.CallOption) (*CreateMultipartResponse, error)
+	DeleteMultipart(ctx context.Context, in *DeleteMultipartRequest, opts ...grpc.CallOption) (*DeleteMultipartResponse, error)
+	QueryMultipart(ctx context.Context, in *QueryMultipartRequest, opts ...grpc.CallOption) (*QueryMultipartResponse, error)
+	ListMultiparts(ctx context.Context, in *ListMultipartsRequest, opts ...grpc.CallOption) (*ListMultipartsResponse, error)
 }
 
 type mdsServiceClient struct {
@@ -766,6 +1567,51 @@ func (c *mdsServiceClient) ListObjects(ctx context.Context, in *ListObjectsReque
 	return out, nil
 }
 
+func (c *mdsServiceClient) ListAllObjects(ctx context.Context, in *ListAllObjectsRequest, opts ...grpc.CallOption) (*ListAllObjectsResponse, error) {
+	out := new(ListAllObjectsResponse)
+	err := c.cc.Invoke(ctx, "/protos.MdsService/ListAllObjects", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mdsServiceClient) CreateMultipart(ctx context.Context, in *CreateMultipartRequest, opts ...grpc.CallOption) (*CreateMultipartResponse, error) {
+	out := new(CreateMultipartResponse)
+	err := c.cc.Invoke(ctx, "/protos.MdsService/CreateMultipart", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mdsServiceClient) DeleteMultipart(ctx context.Context, in *DeleteMultipartRequest, opts ...grpc.CallOption) (*DeleteMultipartResponse, error) {
+	out := new(DeleteMultipartResponse)
+	err := c.cc.Invoke(ctx, "/protos.MdsService/DeleteMultipart", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mdsServiceClient) QueryMultipart(ctx context.Context, in *QueryMultipartRequest, opts ...grpc.CallOption) (*QueryMultipartResponse, error) {
+	out := new(QueryMultipartResponse)
+	err := c.cc.Invoke(ctx, "/protos.MdsService/QueryMultipart", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mdsServiceClient) ListMultiparts(ctx context.Context, in *ListMultipartsRequest, opts ...grpc.CallOption) (*ListMultipartsResponse, error) {
+	out := new(ListMultipartsResponse)
+	err := c.cc.Invoke(ctx, "/protos.MdsService/ListMultiparts", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MdsServiceServer is the server API for MdsService service.
 type MdsServiceServer interface {
 	// object operations
@@ -773,6 +1619,12 @@ type MdsServiceServer interface {
 	DeleteObject(context.Context, *DeleteObjectRequest) (*DeleteObjectResponse, error)
 	QueryObject(context.Context, *QueryObjectRequest) (*QueryObjectResponse, error)
 	ListObjects(context.Context, *ListObjectsRequest) (*ListObjectsResponse, error)
+	ListAllObjects(context.Context, *ListAllObjectsRequest) (*ListAllObjectsResponse, error)
+	// multipart operations
+	CreateMultipart(context.Context, *CreateMultipartRequest) (*CreateMultipartResponse, error)
+	DeleteMultipart(context.Context, *DeleteMultipartRequest) (*DeleteMultipartResponse, error)
+	QueryMultipart(context.Context, *QueryMultipartRequest) (*QueryMultipartResponse, error)
+	ListMultiparts(context.Context, *ListMultipartsRequest) (*ListMultipartsResponse, error)
 }
 
 // UnimplementedMdsServiceServer can be embedded to have forward compatible implementations.
@@ -790,6 +1642,21 @@ func (*UnimplementedMdsServiceServer) QueryObject(context.Context, *QueryObjectR
 }
 func (*UnimplementedMdsServiceServer) ListObjects(context.Context, *ListObjectsRequest) (*ListObjectsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListObjects not implemented")
+}
+func (*UnimplementedMdsServiceServer) ListAllObjects(context.Context, *ListAllObjectsRequest) (*ListAllObjectsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListAllObjects not implemented")
+}
+func (*UnimplementedMdsServiceServer) CreateMultipart(context.Context, *CreateMultipartRequest) (*CreateMultipartResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateMultipart not implemented")
+}
+func (*UnimplementedMdsServiceServer) DeleteMultipart(context.Context, *DeleteMultipartRequest) (*DeleteMultipartResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteMultipart not implemented")
+}
+func (*UnimplementedMdsServiceServer) QueryMultipart(context.Context, *QueryMultipartRequest) (*QueryMultipartResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryMultipart not implemented")
+}
+func (*UnimplementedMdsServiceServer) ListMultiparts(context.Context, *ListMultipartsRequest) (*ListMultipartsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListMultiparts not implemented")
 }
 
 func RegisterMdsServiceServer(s *grpc.Server, srv MdsServiceServer) {
@@ -868,6 +1735,96 @@ func _MdsService_ListObjects_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MdsService_ListAllObjects_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAllObjectsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MdsServiceServer).ListAllObjects(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/protos.MdsService/ListAllObjects",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MdsServiceServer).ListAllObjects(ctx, req.(*ListAllObjectsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MdsService_CreateMultipart_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateMultipartRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MdsServiceServer).CreateMultipart(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/protos.MdsService/CreateMultipart",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MdsServiceServer).CreateMultipart(ctx, req.(*CreateMultipartRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MdsService_DeleteMultipart_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteMultipartRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MdsServiceServer).DeleteMultipart(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/protos.MdsService/DeleteMultipart",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MdsServiceServer).DeleteMultipart(ctx, req.(*DeleteMultipartRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MdsService_QueryMultipart_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryMultipartRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MdsServiceServer).QueryMultipart(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/protos.MdsService/QueryMultipart",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MdsServiceServer).QueryMultipart(ctx, req.(*QueryMultipartRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MdsService_ListMultiparts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMultipartsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MdsServiceServer).ListMultiparts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/protos.MdsService/ListMultiparts",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MdsServiceServer).ListMultiparts(ctx, req.(*ListMultipartsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _MdsService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "protos.MdsService",
 	HandlerType: (*MdsServiceServer)(nil),
@@ -887,6 +1844,26 @@ var _MdsService_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListObjects",
 			Handler:    _MdsService_ListObjects_Handler,
+		},
+		{
+			MethodName: "ListAllObjects",
+			Handler:    _MdsService_ListAllObjects_Handler,
+		},
+		{
+			MethodName: "CreateMultipart",
+			Handler:    _MdsService_CreateMultipart_Handler,
+		},
+		{
+			MethodName: "DeleteMultipart",
+			Handler:    _MdsService_DeleteMultipart_Handler,
+		},
+		{
+			MethodName: "QueryMultipart",
+			Handler:    _MdsService_QueryMultipart_Handler,
+		},
+		{
+			MethodName: "ListMultiparts",
+			Handler:    _MdsService_ListMultiparts_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -93,3 +93,13 @@ message Object {
   google.protobuf.Timestamp expires = 19;
   google.protobuf.Timestamp restore_expires = 20;
 }
+
+// multipart
+message Multipart {
+    string upload_id = 1;
+    string physical_upload_id = 2;
+    string vbucket = 3;
+    string physical_bucket = 4;
+    string object = 5;
+    google.protobuf.Timestamp created_time = 6;
+}

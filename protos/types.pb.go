@@ -745,6 +745,94 @@ func (x *Object) GetRestoreExpires() *timestamppb.Timestamp {
 	return nil
 }
 
+// multipart
+type Multipart struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	UploadId         string                 `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
+	PhysicalUploadId string                 `protobuf:"bytes,2,opt,name=physical_upload_id,json=physicalUploadId,proto3" json:"physical_upload_id,omitempty"`
+	Vbucket          string                 `protobuf:"bytes,3,opt,name=vbucket,proto3" json:"vbucket,omitempty"`
+	PhysicalBucket   string                 `protobuf:"bytes,4,opt,name=physical_bucket,json=physicalBucket,proto3" json:"physical_bucket,omitempty"`
+	Object           string                 `protobuf:"bytes,5,opt,name=object,proto3" json:"object,omitempty"`
+	CreatedTime      *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_time,json=createdTime,proto3" json:"created_time,omitempty"`
+}
+
+func (x *Multipart) Reset() {
+	*x = Multipart{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_types_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Multipart) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Multipart) ProtoMessage() {}
+
+func (x *Multipart) ProtoReflect() protoreflect.Message {
+	mi := &file_types_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Multipart.ProtoReflect.Descriptor instead.
+func (*Multipart) Descriptor() ([]byte, []int) {
+	return file_types_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *Multipart) GetUploadId() string {
+	if x != nil {
+		return x.UploadId
+	}
+	return ""
+}
+
+func (x *Multipart) GetPhysicalUploadId() string {
+	if x != nil {
+		return x.PhysicalUploadId
+	}
+	return ""
+}
+
+func (x *Multipart) GetVbucket() string {
+	if x != nil {
+		return x.Vbucket
+	}
+	return ""
+}
+
+func (x *Multipart) GetPhysicalBucket() string {
+	if x != nil {
+		return x.PhysicalBucket
+	}
+	return ""
+}
+
+func (x *Multipart) GetObject() string {
+	if x != nil {
+		return x.Object
+	}
+	return ""
+}
+
+func (x *Multipart) GetCreatedTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedTime
+	}
+	return nil
+}
+
 var File_types_proto protoreflect.FileDescriptor
 
 var file_types_proto_rawDesc = []byte{
@@ -867,9 +955,24 @@ var file_types_proto_rawDesc = []byte{
 	0x72, 0x65, 0x73, 0x18, 0x14, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67,
 	0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65,
 	0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x0e, 0x72, 0x65, 0x73, 0x74, 0x6f, 0x72, 0x65, 0x45, 0x78,
-	0x70, 0x69, 0x72, 0x65, 0x73, 0x42, 0x18, 0x5a, 0x16, 0x6c, 0x69, 0x78, 0x69, 0x61, 0x6e, 0x67,
-	0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x72, 0x70, 0x63, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x62,
-	0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x70, 0x69, 0x72, 0x65, 0x73, 0x22, 0xf0, 0x01, 0x0a, 0x09, 0x4d, 0x75, 0x6c, 0x74, 0x69, 0x70,
+	0x61, 0x72, 0x74, 0x12, 0x1b, 0x0a, 0x09, 0x75, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x5f, 0x69, 0x64,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x75, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x49, 0x64,
+	0x12, 0x2c, 0x0a, 0x12, 0x70, 0x68, 0x79, 0x73, 0x69, 0x63, 0x61, 0x6c, 0x5f, 0x75, 0x70, 0x6c,
+	0x6f, 0x61, 0x64, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x10, 0x70, 0x68,
+	0x79, 0x73, 0x69, 0x63, 0x61, 0x6c, 0x55, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x49, 0x64, 0x12, 0x18,
+	0x0a, 0x07, 0x76, 0x62, 0x75, 0x63, 0x6b, 0x65, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x07, 0x76, 0x62, 0x75, 0x63, 0x6b, 0x65, 0x74, 0x12, 0x27, 0x0a, 0x0f, 0x70, 0x68, 0x79, 0x73,
+	0x69, 0x63, 0x61, 0x6c, 0x5f, 0x62, 0x75, 0x63, 0x6b, 0x65, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x0e, 0x70, 0x68, 0x79, 0x73, 0x69, 0x63, 0x61, 0x6c, 0x42, 0x75, 0x63, 0x6b, 0x65,
+	0x74, 0x12, 0x16, 0x0a, 0x06, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x18, 0x05, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x06, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x12, 0x3d, 0x0a, 0x0c, 0x63, 0x72, 0x65,
+	0x61, 0x74, 0x65, 0x64, 0x5f, 0x74, 0x69, 0x6d, 0x65, 0x18, 0x06, 0x20, 0x01, 0x28, 0x0b, 0x32,
+	0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
+	0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x0b, 0x63, 0x72, 0x65,
+	0x61, 0x74, 0x65, 0x64, 0x54, 0x69, 0x6d, 0x65, 0x42, 0x18, 0x5a, 0x16, 0x6c, 0x69, 0x78, 0x69,
+	0x61, 0x6e, 0x67, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x72, 0x70, 0x63, 0x2f, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -884,7 +987,7 @@ func file_types_proto_rawDescGZIP() []byte {
 	return file_types_proto_rawDescData
 }
 
-var file_types_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_types_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_types_proto_goTypes = []interface{}{
 	(*Mds)(nil),                   // 0: protos.Mds
 	(*Credentials)(nil),           // 1: protos.Credentials
@@ -892,21 +995,23 @@ var file_types_proto_goTypes = []interface{}{
 	(*Bucket)(nil),                // 3: protos.Bucket
 	(*VBucket)(nil),               // 4: protos.VBucket
 	(*Object)(nil),                // 5: protos.Object
-	(*timestamppb.Timestamp)(nil), // 6: google.protobuf.Timestamp
+	(*Multipart)(nil),             // 6: protos.Multipart
+	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
 }
 var file_types_proto_depIdxs = []int32{
 	1, // 0: protos.Pool.creds:type_name -> protos.Credentials
-	6, // 1: protos.VBucket.created_time:type_name -> google.protobuf.Timestamp
-	6, // 2: protos.VBucket.updated_time:type_name -> google.protobuf.Timestamp
-	6, // 3: protos.Object.mod_time:type_name -> google.protobuf.Timestamp
-	6, // 4: protos.Object.acc_time:type_name -> google.protobuf.Timestamp
-	6, // 5: protos.Object.expires:type_name -> google.protobuf.Timestamp
-	6, // 6: protos.Object.restore_expires:type_name -> google.protobuf.Timestamp
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	7, // 1: protos.VBucket.created_time:type_name -> google.protobuf.Timestamp
+	7, // 2: protos.VBucket.updated_time:type_name -> google.protobuf.Timestamp
+	7, // 3: protos.Object.mod_time:type_name -> google.protobuf.Timestamp
+	7, // 4: protos.Object.acc_time:type_name -> google.protobuf.Timestamp
+	7, // 5: protos.Object.expires:type_name -> google.protobuf.Timestamp
+	7, // 6: protos.Object.restore_expires:type_name -> google.protobuf.Timestamp
+	7, // 7: protos.Multipart.created_time:type_name -> google.protobuf.Timestamp
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_types_proto_init() }
@@ -987,6 +1092,18 @@ func file_types_proto_init() {
 				return nil
 			}
 		}
+		file_types_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Multipart); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -994,7 +1111,7 @@ func file_types_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_types_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

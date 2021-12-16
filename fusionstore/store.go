@@ -223,6 +223,7 @@ func (s *Store) ListObjects(ctx context.Context, bucket string, prefix string, m
 
 // ListObjectsV2 lists all blobs in S3 bucket filtered by prefix
 func (s *Store) ListObjectsV2(ctx context.Context, bucket, prefix, continuationToken, delimiter string, maxKeys int, fetchOwner bool, startAfter string) (loi minio.ListObjectsV2Info, e error) {
+	// FIXME(yangchunxin): why use v2?
 	return minio.ListObjectsV2Info{}, minio.NotImplemented{}
 }
 
@@ -475,13 +476,10 @@ func (s *Store) CopyObjectPart(ctx context.Context, srcBucket, srcObject, destBu
 
 // GetMultipartInfo returns multipart info of the uploadId of the object
 func (s *Store) GetMultipartInfo(ctx context.Context, bucket, object, uploadID string, opts minio.ObjectOptions) (result minio.MultipartInfo, err error) {
-	/*
-		result.Bucket = bucket
-		result.Object = object
-		result.UploadID = uploadID
-		return result, nil
-	*/
-	return minio.MultipartInfo{}, nil
+	result.Bucket = bucket
+	result.Object = object
+	result.UploadID = uploadID
+	return result, nil
 }
 
 // ListObjectParts returns all object parts for specified object in specified bucket
