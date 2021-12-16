@@ -225,6 +225,15 @@ func (m *Mgr) GetPoolAndBucket(vbucket, object string) (*pool.Pool, string) {
 	return m.PoolMgr.GetPool(vb.Pool), pBucket
 }
 
+// GetPool xxx
+func (m *Mgr) GetPool(vbucket string) *pool.Pool {
+	vb := m.getVBucket(vbucket)
+	if vb == nil {
+		return nil
+	}
+	return m.PoolMgr.GetPool(vb.Pool)
+}
+
 /* object apis */
 func (m *Mgr) putObject(obj *object.Object) error {
 	vb := m.getVBucket(obj.VBucket)
@@ -487,4 +496,26 @@ func (m *Mgr) GetObjectPoolAndBucket(vbucket, object string) (*pool.Pool, string
 func (m *Mgr) GetObjectKey(vbucket, object string) string {
 	// add vbucket prefix
 	return fmt.Sprintf("%s/%s", vbucket, object)
+}
+
+// CreateMultipart xxx
+func (m *Mgr) CreateMultipart(pBucket, pObject, bucket, object, physicalUploadID string) (string, error) {
+	mp := &multipart.Multipart{
+		PhysicalUploadID: physicalUploadID,
+		VBucket:          bucket,
+		PhysicalBucket:   pBucket,
+		Object:           object,
+		CreatedTime:      time.Now(),
+	}
+	return m.createMultipart(mp)
+}
+
+// QueryMultipart xxx
+func (m *Mgr) QueryMultipart(bucket, uploadID string) (*multipart.Multipart, error) {
+	return m.getMultipart(bucket, uploadID)
+}
+
+//DeleteMultipart xxx
+func (m *Mgr) DeleteMultipart(bucket, uploadID string) error {
+	return m.deleteMultipart(bucket, uploadID)
 }

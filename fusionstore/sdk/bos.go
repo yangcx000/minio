@@ -108,3 +108,28 @@ func (b *Bos) DeleteObject(ctx context.Context, pBucket string, pObject string, 
 	}
 	return objInfo, nil
 }
+
+// NewMultipartUpload xxx
+func (b *Bos) NewMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, o minio.ObjectOptions) (uploadID string, err error) {
+	return "", nil
+}
+
+// PutObjectPart xxx
+func (b *Bos) PutObjectPart(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, partID int, r *minio.PutObjReader, opts minio.ObjectOptions) (pi minio.PartInfo, e error) {
+	return minio.PartInfo{}, nil
+}
+
+// ListObjectParts xxx
+func (b *Bos) ListObjectParts(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, partNumberMarker int, maxParts int, opts minio.ObjectOptions) (lpi minio.ListPartsInfo, e error) {
+	return minio.ListPartsInfo{}, nil
+}
+
+// AbortMultipartUpload xxx
+func (b *Bos) AbortMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, opts minio.ObjectOptions) error {
+	return nil
+}
+
+// CompleteMultipartUpload xxx
+func (b *Bos) CompleteMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, uploadedParts []minio.CompletePart, opts minio.ObjectOptions) (oi minio.ObjectInfo, e error) {
+	return minio.ObjectInfo{}, nil
+}
