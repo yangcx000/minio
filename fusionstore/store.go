@@ -17,6 +17,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/tags"
 	minio "github.com/minio/minio/cmd"
 	"github.com/minio/minio/fusionstore/mgs"
+	"github.com/minio/minio/fusionstore/object"
 	"github.com/minio/minio/fusionstore/pool"
 	"github.com/minio/minio/fusionstore/sdk"
 	"github.com/minio/minio/fusionstore/vbucket"
@@ -196,7 +197,15 @@ func (s *Store) ListObjects(ctx context.Context, bucket string, prefix string, m
 	if err := s3utils.CheckValidObjectNamePrefix(prefix); err != nil {
 		return minio.ListObjectsInfo{}, err
 	}
-	results, err := s.VBucketMgr.ListObjects(bucket, prefix, marker, delimiter, maxKeys)
+	lop := &object.ListObjectsParam{
+		VBucket:   bucket,
+		Prefix:    prefix,
+		Marker:    marker,
+		Delimiter: delimiter,
+		Limits:    maxKeys,
+	}
+	results, err := s.VBucketMgr.ListObjects(lop)
+	//results, err := s.VBucketMgr.ListObjects(bucket, prefix, marker, delimiter, maxKeys)
 	if err != nil {
 		return loi, minio.ErrorRespToObjectError(err, bucket)
 	}

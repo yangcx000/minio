@@ -14,6 +14,7 @@ import (
 
 // Object xxx
 type Object struct {
+	ID              string    `json:"id"`
 	Name            string    `json:"name"`
 	VBucket         string    `json:"vbucket"`
 	Pool            string    `json:"pool"`
@@ -39,6 +40,7 @@ type Object struct {
 // EncodeToPb xxx
 func (o *Object) EncodeToPb() *protos.Object {
 	v := &protos.Object{
+		Id:              o.ID,
 		Name:            o.Name,
 		Vbucket:         o.VBucket,
 		Pool:            o.Pool,
@@ -65,6 +67,7 @@ func (o *Object) EncodeToPb() *protos.Object {
 
 // DecodeFromPb xxx
 func (o *Object) DecodeFromPb(p *protos.Object) {
+	o.ID = p.Id
 	o.Name = p.Name
 	o.VBucket = p.Vbucket
 	o.Pool = p.Pool
@@ -85,4 +88,20 @@ func (o *Object) DecodeFromPb(p *protos.Object) {
 	o.AccTime = p.AccTime.AsTime()
 	o.Expires = p.Expires.AsTime()
 	o.RestoreExpires = p.RestoreExpires.AsTime()
+}
+
+// ListObjectsParam xxx
+type ListObjectsParam struct {
+	VBucket   string
+	Prefix    string
+	Marker    string
+	Delimiter string
+	Limits    int
+}
+
+// ListObjectsResult xxx
+type ListObjectsResult struct {
+	Objects       []*Object
+	CommonPrefixs []string
+	NextMarker    string
 }

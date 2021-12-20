@@ -48,10 +48,10 @@ func (s *Service) PutObject(obj *object.Object) (*protos.PutObjectResponse, erro
 }
 
 // DeleteObject xxx
-func (s *Service) DeleteObject(vbucket, object string) (*protos.DeleteObjectResponse, error) {
+func (s *Service) DeleteObject(vbucket, objectName string) (*protos.DeleteObjectResponse, error) {
 	req := &protos.DeleteObjectRequest{
-		Vbucket: vbucket,
-		Object:  object,
+		Vbucket:    vbucket,
+		ObjectName: objectName,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
@@ -59,10 +59,10 @@ func (s *Service) DeleteObject(vbucket, object string) (*protos.DeleteObjectResp
 }
 
 // QueryObject xxx
-func (s *Service) QueryObject(vbucket, object string) (*protos.QueryObjectResponse, error) {
+func (s *Service) QueryObject(vbucket, objectName string) (*protos.QueryObjectResponse, error) {
 	req := &protos.QueryObjectRequest{
-		Vbucket: vbucket,
-		Object:  object,
+		Vbucket:    vbucket,
+		ObjectName: objectName,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
@@ -70,13 +70,13 @@ func (s *Service) QueryObject(vbucket, object string) (*protos.QueryObjectRespon
 }
 
 // ListObjects xxx
-func (s *Service) ListObjects(vbucket, prefix, marker, delimiter string, limits int32) (*protos.ListObjectsResponse, error) {
+func (s *Service) ListObjects(lop *object.ListObjectsParam) (*protos.ListObjectsResponse, error) {
 	req := &protos.ListObjectsRequest{
-		Vbucket:   vbucket,
-		Prefix:    prefix,
-		Marker:    marker,
-		Delimiter: delimiter,
-		Limits:    limits,
+		Vbucket:   lop.VBucket,
+		Prefix:    lop.Prefix,
+		Marker:    lop.Marker,
+		Delimiter: lop.Delimiter,
+		Limits:    int32(lop.Limits),
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()

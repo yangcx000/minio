@@ -20,7 +20,7 @@ message PutObjectResponse {
 
 message DeleteObjectRequest {
     string vbucket = 1;
-    string object = 2;
+    string object_name = 2;
 }
 
 message DeleteObjectResponse {
@@ -29,7 +29,7 @@ message DeleteObjectResponse {
 
 message QueryObjectRequest {
     string vbucket = 1;
-    string object = 2;
+    string object_name = 2;
 }
 
 message QueryObjectResponse {
@@ -47,11 +47,12 @@ message ListObjectsRequest {
 
 message ListObjectsResponse {
     Status status = 1;
-    string next = 2;
+    string next_marker = 2;
     repeated Object objects = 3;
     repeated string common_prefixs = 4;
 }
 
+// FIXME(yangchunxin): refactor it
 message ListAllObjectsRequest {
     string prev = 1;
     int32 limits = 2;

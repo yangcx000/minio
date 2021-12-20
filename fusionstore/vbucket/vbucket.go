@@ -279,34 +279,36 @@ func (m *Mgr) deleteObject(vbucket, object string) error {
 	return nil
 }
 
-func (m *Mgr) listObjects(vbucket, prefix, marker, delimiter string, maxKeys int) ([]*object.Object, []string, string, error) {
-	nextMarker := ""
-	vb := m.getVBucket(vbucket)
+func (m *Mgr) listObjects(lop *object.ListObjectsParam) (*object.ListObjectsResult, error) {
+	vb := m.getVBucket(lop.VBucket)
 	if vb == nil {
-		return nil, nil, nextMarker, errors.New("couldn't get vbucket")
+		return nil, errors.New("couldn't get vbucket")
 	}
 	srv := m.MdsMgr.GetService(vb.Mds)
 	if srv == nil {
-		return nil, nil, nextMarker, errors.New("couldn't get mds service")
+		return nil, errors.New("couldn't get mds service")
 	}
-	if maxKeys > scanLimits {
-		return nil, nil, nextMarker, fmt.Errorf("object limits must less than %d", scanLimits)
+	if lop.Limits > scanLimits {
+		return nil, fmt.Errorf("list limits must less than %d", scanLimits)
 	}
-	resp, err := srv.ListObjects(vbucket, prefix, marker, delimiter, int32(maxKeys))
+	resp, err := srv.ListObjects(lop)
 	if err != nil {
-		return nil, nil, nextMarker, err
+		return nil, err
 	}
 	if resp.GetStatus().Code != protos.Code_OK {
-		return nil, nil, nextMarker, fmt.Errorf("%s", resp.GetStatus().GetMsg())
+		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
-	objs := make([]*object.Object, len(resp.GetObjects()))
+	lor := &object.ListObjectsResult{
+		CommonPrefixs: resp.GetCommonPrefixs(),
+		NextMarker:    resp.GetNextMarker(),
+	}
+	lor.Objects = make([]*object.Object, len(resp.GetObjects()))
 	for i, v := range resp.GetObjects() {
 		obj := &object.Object{}
 		obj.DecodeFromPb(v)
-		objs[i] = obj
+		lor.Objects[i] = obj
 	}
-	nextMarker = resp.GetNext()
-	return objs, resp.GetCommonPrefixs(), nextMarker, nil
+	return lor, nil
 }
 
 // multipart apis
@@ -448,13 +450,13 @@ func (m *Mgr) DeleteObjectMeta(vbucket, object string) error {
 }
 
 // ListObjects xxx
-func (m *Mgr) ListObjects(vbucket, prefix, marker, delimiter string, maxKeys int) (minio.ListObjectsInfo, error) {
-	objs, commonPrefixs, nextMarker, err := m.listObjects(vbucket, prefix, marker, delimiter, maxKeys)
+func (m *Mgr) ListObjects(lop *object.ListObjectsParam) (minio.ListObjectsInfo, error) {
+	lor, err := m.listObjects(lop)
 	if err != nil {
 		return minio.ListObjectsInfo{}, err
 	}
-	objInfos := make([]minio.ObjectInfo, len(objs))
-	for i, obj := range objs {
+	objInfos := make([]minio.ObjectInfo, len(lor.Objects))
+	for i, obj := range lor.Objects {
 		objInfo := minio.ObjectInfo{
 			Name:            obj.Name,
 			Bucket:          obj.VBucket,
@@ -477,11 +479,15 @@ func (m *Mgr) ListObjects(vbucket, prefix, marker, delimiter string, maxKeys int
 		}
 		objInfos[i] = objInfo
 	}
+	isTruncated := false
+	if len(lor.NextMarker) != 0 {
+		isTruncated = true
+	}
 	return minio.ListObjectsInfo{
-		IsTruncated: false,
+		IsTruncated: isTruncated,
 		Objects:     objInfos,
-		NextMarker:  nextMarker,
-		Prefixes:    commonPrefixs,
+		NextMarker:  lor.NextMarker,
+		Prefixes:    lor.CommonPrefixs,
 	}, nil
 }
 
