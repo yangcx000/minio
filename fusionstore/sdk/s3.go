@@ -8,6 +8,7 @@ package sdk
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -234,5 +235,16 @@ func (s *S3) CompleteMultipartUpload(ctx context.Context, pBucket string, pObjec
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	return minio.ObjectInfo{Bucket: bucket, Name: object, ETag: strings.Trim(etag, "\"")}, nil
+	cmdObjInfo, err := s.client.StatObject(ctx, pBucket, pObject, miniogo.StatObjectOptions{})
+	if err != nil {
+		return oi, minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	oi = minio.FromMinioClientObjectInfo(bucket, cmdObjInfo)
+	// replace pobject with object
+	oi.Name = object
+	cmuEtag := strings.Trim(etag, "\"")
+	if cmuEtag != oi.ETag {
+		fmt.Printf("****************CompleteMultipartUpload Etag %s != objInfo Etag %s\n", cmuEtag, oi.ETag)
+	}
+	return oi, nil
 }

@@ -279,25 +279,25 @@ func (m *Mgr) deleteObject(vbucket, object string) error {
 	return nil
 }
 
-func (m *Mgr) listObjects(vbucket, marker string, numObjects int) ([]*object.Object, string, error) {
+func (m *Mgr) listObjects(vbucket, prefix, marker, delimiter string, maxKeys int) ([]*object.Object, []string, string, error) {
 	nextMarker := ""
 	vb := m.getVBucket(vbucket)
 	if vb == nil {
-		return nil, nextMarker, errors.New("couldn't get vbucket")
+		return nil, nil, nextMarker, errors.New("couldn't get vbucket")
 	}
 	srv := m.MdsMgr.GetService(vb.Mds)
 	if srv == nil {
-		return nil, nextMarker, errors.New("couldn't get mds service")
+		return nil, nil, nextMarker, errors.New("couldn't get mds service")
 	}
-	if numObjects > scanLimits {
-		return nil, nextMarker, fmt.Errorf("object limits must less than %d", scanLimits)
+	if maxKeys > scanLimits {
+		return nil, nil, nextMarker, fmt.Errorf("object limits must less than %d", scanLimits)
 	}
-	resp, err := srv.ListObjects(vbucket, marker, int32(numObjects))
+	resp, err := srv.ListObjects(vbucket, prefix, marker, delimiter, int32(maxKeys))
 	if err != nil {
-		return nil, nextMarker, err
+		return nil, nil, nextMarker, err
 	}
 	if resp.GetStatus().Code != protos.Code_OK {
-		return nil, nextMarker, fmt.Errorf("%s", resp.GetStatus().GetMsg())
+		return nil, nil, nextMarker, fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
 	objs := make([]*object.Object, len(resp.GetObjects()))
 	for i, v := range resp.GetObjects() {
@@ -306,7 +306,7 @@ func (m *Mgr) listObjects(vbucket, marker string, numObjects int) ([]*object.Obj
 		objs[i] = obj
 	}
 	nextMarker = resp.GetNext()
-	return objs, nextMarker, nil
+	return objs, resp.GetCommonPrefixs(), nextMarker, nil
 }
 
 // multipart apis
@@ -449,7 +449,7 @@ func (m *Mgr) DeleteObjectMeta(vbucket, object string) error {
 
 // ListObjects xxx
 func (m *Mgr) ListObjects(vbucket, prefix, marker, delimiter string, maxKeys int) (minio.ListObjectsInfo, error) {
-	objs, nextMarker, err := m.listObjects(vbucket, marker, maxKeys)
+	objs, commonPrefixs, nextMarker, err := m.listObjects(vbucket, prefix, marker, delimiter, maxKeys)
 	if err != nil {
 		return minio.ListObjectsInfo{}, err
 	}
@@ -478,8 +478,10 @@ func (m *Mgr) ListObjects(vbucket, prefix, marker, delimiter string, maxKeys int
 		objInfos[i] = objInfo
 	}
 	return minio.ListObjectsInfo{
-		Objects:    objInfos,
-		NextMarker: nextMarker,
+		IsTruncated: false,
+		Objects:     objInfos,
+		NextMarker:  nextMarker,
+		Prefixes:    commonPrefixs,
 	}, nil
 }
 

@@ -39,14 +39,17 @@ message QueryObjectResponse {
 
 message ListObjectsRequest {
     string vbucket = 1;
-    string prev = 2;
-    int32 limits = 3;
+    string prefix = 2;
+    string marker = 3;
+    string delimiter = 4;
+    int32 limits = 5;
 }
 
 message ListObjectsResponse {
     Status status = 1;
     string next = 2;
     repeated Object objects = 3;
+    repeated string common_prefixs = 4;
 }
 
 message ListAllObjectsRequest {

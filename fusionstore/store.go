@@ -27,7 +27,7 @@ const (
 	serviceTimeout = 10
 )
 
-// Store xxx
+// Store implements gateway apis.
 type Store struct {
 	minio.GatewayUnsupported
 	// vendor --> {pool_id --> client}
@@ -54,7 +54,7 @@ func New(mgsAddr string) (*Store, error) {
 		HTTPClient: &http.Client{
 			Transport: t,
 		},
-		debug: true,
+		//debug: true,
 	}
 	err := s.init(mgsAddr, t)
 	return s, err
@@ -77,40 +77,30 @@ func (s *Store) init(mgsAddr string, transport http.RoundTripper) error {
 func (s *Store) initClients(transport http.RoundTripper) error {
 	s.Pools = make(map[string]map[string]sdk.Client)
 	for k, v := range s.VBucketMgr.PoolMgr.Pools {
+		_, exists := s.Pools[v.Vendor]
+		if !exists {
+			s.Pools[v.Vendor] = make(map[string]sdk.Client)
+		}
+		var (
+			c   sdk.Client
+			err error
+		)
 		switch v.Vendor {
 		case pool.VendorAws:
-			_, exists := s.Pools[pool.VendorAws]
-			if !exists {
-				s.Pools[pool.VendorAws] = make(map[string]sdk.Client)
-			}
-			c, err := sdk.NewS3Client(v.Endpoint, v.Creds.AccessKey, v.Creds.SecretKey, transport)
-			if err != nil {
-				return err
-			}
-			s.Pools[pool.VendorAws][k] = c
+			c, err = sdk.NewS3Client(v.Endpoint, v.Creds.AccessKey, v.Creds.SecretKey,
+				transport)
 		case pool.VendorCeph:
-			_, exists := s.Pools[pool.VendorCeph]
-			if !exists {
-				s.Pools[pool.VendorCeph] = make(map[string]sdk.Client)
-			}
-			c, err := sdk.NewS3Client(v.Endpoint, v.Creds.AccessKey, v.Creds.SecretKey, transport)
-			if err != nil {
-				return err
-			}
-			s.Pools[pool.VendorCeph][k] = c
+			c, err = sdk.NewS3Client(v.Endpoint, v.Creds.AccessKey, v.Creds.SecretKey,
+				transport)
 		case pool.VendorBaidu:
-			_, exists := s.Pools[pool.VendorBaidu]
-			if !exists {
-				s.Pools[pool.VendorBaidu] = make(map[string]sdk.Client)
-			}
-			c, err := sdk.NewBosClient(v.Endpoint, v.Creds.AccessKey, v.Creds.SecretKey)
-			if err != nil {
-				return err
-			}
-			s.Pools[pool.VendorBaidu][k] = c
-		case pool.VendorUnknown:
-			// FIXME(yangchunxin): print error log
+			c, err = sdk.NewBosClient(v.Endpoint, v.Creds.AccessKey, v.Creds.SecretKey)
+		default:
+			return fmt.Errorf("pool %q has unknown vendor type %q", k, v.Vendor)
 		}
+		if err != nil {
+			return err
+		}
+		s.Pools[v.Vendor][k] = c
 	}
 	return nil
 }
@@ -128,26 +118,20 @@ func (s *Store) Shutdown(ctx context.Context) error {
 
 // StorageInfo is not relevant to S3 backend.
 func (s *Store) StorageInfo(ctx context.Context) (si minio.StorageInfo, _ []error) {
+	// TODO(yangchunxin): check bucket exists using probe bucket on every pool
 	si.Backend.Type = madmin.Gateway
-	// TODO(yangchunxin): update later
 	si.Backend.GatewayOnline = true
 	return si, nil
 }
 
 /*****************************************Bucket Operations***************************************/
 
-// MakeBucketWithLocation creates a new container on S3 backend.
-func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string, opts minio.BucketOptions) error {
+// MakeBucketWithLocation creates a new bucket on S3 backend.
+func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string,
+	opts minio.BucketOptions) error {
 	if opts.LockEnabled || opts.VersioningEnabled {
 		return minio.NotImplemented{}
 	}
-	// Verify if bucket name is valid.
-	// We are using a separate helper function here to validate bucket
-	// names instead of IsValidBucketName() because there is a possibility
-	// that certains users might have buckets which are non-DNS compliant
-	// in us-east-1 and we might severely restrict them by not allowing
-	// access to these buckets.
-	// Ref - http://docs.aws.amazon.com/AmazonS3/latest/dev/BucketRestrictions.html
 	if s3utils.CheckValidBucketName(bucket) != nil {
 		return minio.BucketNameInvalid{Bucket: bucket}
 	}
@@ -158,7 +142,7 @@ func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string, opts 
 	return nil
 }
 
-// GetBucketInfo gets bucket metadata..
+// GetBucketInfo gets bucket metadata.
 func (s *Store) GetBucketInfo(ctx context.Context, bucket string) (bi minio.BucketInfo, e error) {
 	vb, err := s.VBucketMgr.GetVBucketInfo(bucket)
 	if err != nil {
@@ -173,24 +157,25 @@ func (s *Store) GetBucketInfo(ctx context.Context, bucket string) (bi minio.Buck
 	}, nil
 }
 
-// ListBuckets lists all buckets
+// ListBuckets lists all buckets.
 func (s *Store) ListBuckets(ctx context.Context) ([]minio.BucketInfo, error) {
 	vbs, err := s.VBucketMgr.ListVBuckets()
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err)
 	}
-	b := make([]minio.BucketInfo, len(vbs))
+	bis := make([]minio.BucketInfo, len(vbs))
 	for i, v := range vbs {
-		b[i] = minio.BucketInfo{
+		bis[i] = minio.BucketInfo{
 			Name:    v.Name,
 			Created: v.CreatedTime,
 		}
 	}
-	return b, err
+	return bis, err
 }
 
-// DeleteBucket deletes a bucket
-func (s *Store) DeleteBucket(ctx context.Context, bucket string, opts minio.DeleteBucketOptions) error {
+// DeleteBucket deletes one bucket.
+func (s *Store) DeleteBucket(ctx context.Context, bucket string,
+	opts minio.DeleteBucketOptions) error {
 	err := s.VBucketMgr.DeleteVBucket(bucket)
 	if err != nil {
 		return minio.ErrorRespToObjectError(err, bucket)
@@ -201,11 +186,8 @@ func (s *Store) DeleteBucket(ctx context.Context, bucket string, opts minio.Dele
 /*****************************************Object Operations***************************************/
 
 // ListObjects lists all blobs in S3 bucket filtered by prefix
-func (s *Store) ListObjects(ctx context.Context, bucket string, prefix string, marker string, delimiter string, maxKeys int) (loi minio.ListObjectsInfo, e error) {
-	// FIXME(yangchunxin): remove it
-	fmt.Printf("Func:ListObjects, Bucket:%s, Prefix:%s, Marker:%s, Delimiter:%s, MaxKeys:%d\n",
-		bucket, prefix, marker, delimiter, maxKeys)
-
+func (s *Store) ListObjects(ctx context.Context, bucket string, prefix string, marker string,
+	delimiter string, maxKeys int) (loi minio.ListObjectsInfo, e error) {
 	// Validate bucket name.
 	if err := s3utils.CheckValidBucketName(bucket); err != nil {
 		return minio.ListObjectsInfo{}, err
@@ -222,13 +204,16 @@ func (s *Store) ListObjects(ctx context.Context, bucket string, prefix string, m
 }
 
 // ListObjectsV2 lists all blobs in S3 bucket filtered by prefix
-func (s *Store) ListObjectsV2(ctx context.Context, bucket, prefix, continuationToken, delimiter string, maxKeys int, fetchOwner bool, startAfter string) (loi minio.ListObjectsV2Info, e error) {
+func (s *Store) ListObjectsV2(ctx context.Context, bucket, prefix, continuationToken, delimiter string,
+	maxKeys int, fetchOwner bool, startAfter string) (loi minio.ListObjectsV2Info, e error) {
 	// FIXME(yangchunxin): why use v2?
 	return minio.ListObjectsV2Info{}, minio.NotImplemented{}
 }
 
 // GetObjectNInfo - returns object info and locked object ReadCloser
 func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *minio.HTTPRangeSpec, h http.Header, lockType minio.LockType, opts minio.ObjectOptions) (gr *minio.GetObjectReader, err error) {
+	fmt.Printf("----------------GetObjectNInfo: bucket:%s, object:%s, PartNumber:%d, ---------------\n", bucket, object, opts.PartNumber)
+
 	var objInfo minio.ObjectInfo
 	objInfo, err = s.GetObjectInfo(ctx, bucket, object, opts)
 	if err != nil {
@@ -255,6 +240,9 @@ func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *m
 	}
 	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
 	pr, pw := io.Pipe()
+
+	fmt.Printf("----------------GetObjectNInfo: bucket:%s, object:%s, off:%d, len:%d, ---------------\n", bucket, object, off, length)
+
 	go func() {
 		err := client.GetObject(ctx, pBucket, pObject, bucket, object, off, length, pw, objInfo.ETag, opts)
 		pw.CloseWithError(err)
@@ -267,6 +255,8 @@ func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *m
 
 // GetObjectInfo reads object info and replies back ObjectInfo
 func (s *Store) GetObjectInfo(ctx context.Context, bucket string, object string, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
+	//
+	fmt.Printf("----------GetObjectInfo-------\n")
 	objInfo, err = s.VBucketMgr.GetObjectMeta(bucket, object)
 	if err != nil {
 		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
