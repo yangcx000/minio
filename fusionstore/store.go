@@ -106,6 +106,20 @@ func (s *Store) initClients(transport http.RoundTripper) error {
 	return nil
 }
 
+func (s *Store) getClient(pl *pool.Pool) sdk.Client {
+	var client sdk.Client
+	switch pl.Vendor {
+	case pool.VendorAws:
+		client = s.Pools[pool.VendorAws][pl.ID]
+	case pool.VendorCeph:
+		client = s.Pools[pool.VendorCeph][pl.ID]
+	case pool.VendorBaidu:
+		client = s.Pools[pool.VendorBaidu][pl.ID]
+	default:
+	}
+	return client
+}
+
 // GetMetrics returns this gateway's metrics
 func (s *Store) GetMetrics(ctx context.Context) (*minio.BackendMetrics, error) {
 	return s.Metrics, nil
@@ -220,40 +234,32 @@ func (s *Store) ListObjectsV2(ctx context.Context, bucket, prefix, continuationT
 }
 
 // GetObjectNInfo - returns object info and locked object ReadCloser
-func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *minio.HTTPRangeSpec, h http.Header, lockType minio.LockType, opts minio.ObjectOptions) (gr *minio.GetObjectReader, err error) {
-	fmt.Printf("----------------GetObjectNInfo: bucket:%s, object:%s, PartNumber:%d, ---------------\n", bucket, object, opts.PartNumber)
-
-	var objInfo minio.ObjectInfo
-	objInfo, err = s.GetObjectInfo(ctx, bucket, object, opts)
+func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *minio.HTTPRangeSpec, h http.Header, lockType minio.LockType,
+	opts minio.ObjectOptions) (gr *minio.GetObjectReader, err error) {
+	// 1. get object info
+	oi, err := s.GetObjectInfo(ctx, bucket, object, opts)
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	fn, off, length, err := minio.NewGetObjectReader(rs, objInfo, opts)
-	if err != nil {
-		return nil, minio.ErrorRespToObjectError(err, bucket, object)
-	}
+	// 2. get pool and physical bucket
 	pl, pBucket := s.VBucketMgr.GetObjectPoolAndBucket(bucket, object)
 	if pl == nil || len(pBucket) == 0 {
 		return nil, minio.ErrorRespToObjectError(errors.New("object not found"), bucket, object)
 	}
-	var client sdk.Client
-	switch pl.Vendor {
-	case pool.VendorAws:
-		client = s.Pools[pool.VendorAws][pl.ID]
-	case pool.VendorCeph:
-		client = s.Pools[pool.VendorCeph][pl.ID]
-	case pool.VendorBaidu:
-		client = s.Pools[pool.VendorBaidu][pl.ID]
-	default:
-		return nil, minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	// 3. get client of pool
+	client := s.getClient(pl)
+	if client == nil {
+		return nil, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
 	}
+	// 4. get physical object name
 	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
+	fn, off, length, err := minio.NewGetObjectReader(rs, oi, opts)
+	if err != nil {
+		return nil, minio.ErrorRespToObjectError(err, bucket, object)
+	}
 	pr, pw := io.Pipe()
-
-	fmt.Printf("----------------GetObjectNInfo: bucket:%s, object:%s, off:%d, len:%d, ---------------\n", bucket, object, off, length)
-
 	go func() {
-		err := client.GetObject(ctx, pBucket, pObject, bucket, object, off, length, pw, objInfo.ETag, opts)
+		err := client.GetObject(ctx, pBucket, pObject, bucket, object, off, length, pw, oi.ETag, opts)
 		pw.CloseWithError(err)
 	}()
 	// Setup cleanup function to cause the above go-routine to
@@ -263,49 +269,46 @@ func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *m
 }
 
 // GetObjectInfo reads object info and replies back ObjectInfo
-func (s *Store) GetObjectInfo(ctx context.Context, bucket string, object string, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	//
-	fmt.Printf("----------GetObjectInfo-------\n")
-	objInfo, err = s.VBucketMgr.GetObjectMeta(bucket, object)
+func (s *Store) GetObjectInfo(ctx context.Context, bucket string, object string,
+	opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
+	oi, err := s.VBucketMgr.GetObjectMeta(bucket, object)
 	if err != nil {
 		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	return objInfo, nil
+	return oi, nil
 }
 
 // PutObject creates a new object with the incoming data,
-func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *minio.PutObjReader, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	// get pool and physical bucket name
+func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *minio.PutObjReader,
+	opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
+	// 1. get pool and physical bucket name
 	pl, pBucket := s.VBucketMgr.GetPoolAndBucket(bucket, object)
 	if pl == nil || len(pBucket) == 0 {
 		return objInfo, minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
 	}
-	var client sdk.Client
-	switch pl.Vendor {
-	case pool.VendorAws:
-		client = s.Pools[pool.VendorAws][pl.ID]
-	case pool.VendorCeph:
-		client = s.Pools[pool.VendorCeph][pl.ID]
-	case pool.VendorBaidu:
-		client = s.Pools[pool.VendorBaidu][pl.ID]
-	default:
-		return objInfo, minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	// 2. get client of pool
+	client := s.getClient(pl)
+	if client == nil {
+		return objInfo, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
 	}
+	// 3. get physical object name
 	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
-	objInfo, err = client.PutObject(ctx, pBucket, pObject, bucket, object, r, opts)
+	// 4. put object
+	oi, err := client.PutObject(ctx, pBucket, pObject, bucket, object, r, opts)
 	if err != nil {
-		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
+		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	// insert object meta
-	err = s.VBucketMgr.PutObjectMeta(pl.ID, pBucket, objInfo)
+	// 5. insert object meta
+	err = s.VBucketMgr.PutObjectMeta(pl.ID, pBucket, oi)
 	if err != nil {
-		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
+		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	return objInfo, nil
+	return oi, nil
 }
 
 // CopyObject copies an object from source bucket to a destination bucket.
-func (s *Store) CopyObject(ctx context.Context, srcBucket string, srcObject string, dstBucket string, dstObject string, srcInfo minio.ObjectInfo, srcOpts, dstOpts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
+func (s *Store) CopyObject(ctx context.Context, srcBucket string, srcObject string, dstBucket string, dstObject string,
+	srcInfo minio.ObjectInfo, srcOpts, dstOpts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
 	/*
 		if srcOpts.CheckPrecondFn != nil && srcOpts.CheckPrecondFn(srcInfo) {
 			return minio.ObjectInfo{}, minio.PreConditionFailed{}
@@ -338,27 +341,25 @@ func (s *Store) CopyObject(ctx context.Context, srcBucket string, srcObject stri
 }
 
 // DeleteObject deletes a blob in bucket
-func (s *Store) DeleteObject(ctx context.Context, bucket string, object string, opts minio.ObjectOptions) (minio.ObjectInfo, error) {
+func (s *Store) DeleteObject(ctx context.Context, bucket string, object string,
+	opts minio.ObjectOptions) (minio.ObjectInfo, error) {
+	// 1. get pool and physical bucket name
 	pl, pBucket := s.VBucketMgr.GetObjectPoolAndBucket(bucket, object)
 	if pl == nil || len(pBucket) == 0 {
 		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
 	}
-	var client sdk.Client
-	switch pl.Vendor {
-	case pool.VendorAws:
-		client = s.Pools[pool.VendorAws][pl.ID]
-	case pool.VendorCeph:
-		client = s.Pools[pool.VendorCeph][pl.ID]
-	case pool.VendorBaidu:
-		client = s.Pools[pool.VendorBaidu][pl.ID]
-	default:
-		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	// 2. get client
+	client := s.getClient(pl)
+	if client == nil {
+		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
 	}
+	// 3. get physical object name
 	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
 	oi, err := client.DeleteObject(ctx, pBucket, pObject, bucket, object, opts)
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
+	// 4. delete object meta
 	err = s.VBucketMgr.DeleteObjectMeta(bucket, object)
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
@@ -398,28 +399,24 @@ func (s *Store) ListMultipartUploads(ctx context.Context, bucket string, prefix 
 
 // NewMultipartUpload upload object in multiple parts
 func (s *Store) NewMultipartUpload(ctx context.Context, bucket string, object string, o minio.ObjectOptions) (uploadID string, err error) {
-	fmt.Printf("----------------------NewMultipartUpload---------------------------\n")
-	// get pool and physical bucket name
+	// 1. get pool and physical bucket name
 	pl, pBucket := s.VBucketMgr.GetPoolAndBucket(bucket, object)
 	if pl == nil || len(pBucket) == 0 {
 		return "", minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
 	}
-	var client sdk.Client
-	switch pl.Vendor {
-	case pool.VendorAws:
-		client = s.Pools[pool.VendorAws][pl.ID]
-	case pool.VendorCeph:
-		client = s.Pools[pool.VendorCeph][pl.ID]
-	case pool.VendorBaidu:
-		client = s.Pools[pool.VendorBaidu][pl.ID]
-	default:
-		return "", minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	// 2. get client
+	client := s.getClient(pl)
+	if client == nil {
+		return "", minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
 	}
+	// 3. get physical object name
 	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
+	// 4. new multipart upload
 	PhysicUploadID, err := client.NewMultipartUpload(ctx, pBucket, pObject, bucket, object, o)
 	if err != nil {
 		return "", minio.ErrorRespToObjectError(err, bucket, object)
 	}
+	// 5. create multipart meta
 	uploadID, err = s.VBucketMgr.CreateMultipart(pBucket, pObject, bucket, object, PhysicUploadID)
 	if err != nil {
 		return "", minio.ErrorRespToObjectError(err, bucket, object)
@@ -428,27 +425,26 @@ func (s *Store) NewMultipartUpload(ctx context.Context, bucket string, object st
 }
 
 // PutObjectPart puts a part of object in bucket
-func (s *Store) PutObjectPart(ctx context.Context, bucket string, object string, uploadID string, partID int, r *minio.PutObjReader, opts minio.ObjectOptions) (pi minio.PartInfo, e error) {
+func (s *Store) PutObjectPart(ctx context.Context, bucket string, object string, uploadID string, partID int,
+	r *minio.PutObjReader, opts minio.ObjectOptions) (pi minio.PartInfo, e error) {
+	// 1. get multipart meta
 	mp, err := s.VBucketMgr.QueryMultipart(bucket, uploadID)
 	if err != nil {
 		return minio.PartInfo{}, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
 	}
+	// 2. get pool and physical bucket name
 	pl, pBucket := s.VBucketMgr.GetPool(bucket), mp.PhysicalBucket
 	if pl == nil || len(pBucket) == 0 {
 		return minio.PartInfo{}, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
 	}
-	var client sdk.Client
-	switch pl.Vendor {
-	case pool.VendorAws:
-		client = s.Pools[pool.VendorAws][pl.ID]
-	case pool.VendorCeph:
-		client = s.Pools[pool.VendorCeph][pl.ID]
-	case pool.VendorBaidu:
-		client = s.Pools[pool.VendorBaidu][pl.ID]
-	default:
-		return minio.PartInfo{}, minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	// 3. get client
+	client := s.getClient(pl)
+	if client == nil {
+		return pi, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
 	}
+	// 4. get physical object name
 	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
+	// 5. put object part
 	pi, err = client.PutObjectPart(ctx, pBucket, pObject, bucket, object, mp.PhysicalUploadID, partID, r, opts)
 	if err != nil {
 		return pi, minio.ErrorRespToObjectError(err, bucket, object)
@@ -493,7 +489,8 @@ func (s *Store) CopyObjectPart(ctx context.Context, srcBucket, srcObject, destBu
 }
 
 // GetMultipartInfo returns multipart info of the uploadId of the object
-func (s *Store) GetMultipartInfo(ctx context.Context, bucket, object, uploadID string, opts minio.ObjectOptions) (result minio.MultipartInfo, err error) {
+func (s *Store) GetMultipartInfo(ctx context.Context, bucket, object, uploadID string,
+	opts minio.ObjectOptions) (result minio.MultipartInfo, err error) {
 	result.Bucket = bucket
 	result.Object = object
 	result.UploadID = uploadID
@@ -501,27 +498,26 @@ func (s *Store) GetMultipartInfo(ctx context.Context, bucket, object, uploadID s
 }
 
 // ListObjectParts returns all object parts for specified object in specified bucket
-func (s *Store) ListObjectParts(ctx context.Context, bucket string, object string, uploadID string, partNumberMarker int, maxParts int, opts minio.ObjectOptions) (lpi minio.ListPartsInfo, e error) {
+func (s *Store) ListObjectParts(ctx context.Context, bucket string, object string, uploadID string, partNumberMarker int,
+	maxParts int, opts minio.ObjectOptions) (lpi minio.ListPartsInfo, e error) {
+	// 1. get multipart meta
 	mp, err := s.VBucketMgr.QueryMultipart(bucket, uploadID)
 	if err != nil {
-		return minio.ListPartsInfo{}, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
+		return lpi, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
 	}
+	// 2. get pool and physical bucket
 	pl, pBucket := s.VBucketMgr.GetPool(bucket), mp.PhysicalBucket
 	if pl == nil || len(pBucket) == 0 {
-		return minio.ListPartsInfo{}, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
+		return lpi, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
 	}
-	var client sdk.Client
-	switch pl.Vendor {
-	case pool.VendorAws:
-		client = s.Pools[pool.VendorAws][pl.ID]
-	case pool.VendorCeph:
-		client = s.Pools[pool.VendorCeph][pl.ID]
-	case pool.VendorBaidu:
-		client = s.Pools[pool.VendorBaidu][pl.ID]
-	default:
-		return minio.ListPartsInfo{}, minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	// 3. get client
+	client := s.getClient(pl)
+	if client == nil {
+		return lpi, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
 	}
+	// 4. get physical object
 	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
+	// 5. list object parts
 	lpi, err = client.ListObjectParts(ctx, pBucket, pObject, bucket, object, mp.PhysicalUploadID, partNumberMarker, maxParts, opts)
 	if err != nil {
 		return lpi, err
@@ -531,71 +527,66 @@ func (s *Store) ListObjectParts(ctx context.Context, bucket string, object strin
 
 // AbortMultipartUpload aborts a ongoing multipart upload
 func (s *Store) AbortMultipartUpload(ctx context.Context, bucket string, object string, uploadID string, opts minio.ObjectOptions) error {
+	// 1. get multipart meta
 	mp, err := s.VBucketMgr.QueryMultipart(bucket, uploadID)
 	if err != nil {
 		return minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
 	}
+	// 2. get pool and physical bucket
 	pl, pBucket := s.VBucketMgr.GetPool(bucket), mp.PhysicalBucket
 	if pl == nil || len(pBucket) == 0 {
 		return minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
 	}
-	var client sdk.Client
-	switch pl.Vendor {
-	case pool.VendorAws:
-		client = s.Pools[pool.VendorAws][pl.ID]
-	case pool.VendorCeph:
-		client = s.Pools[pool.VendorCeph][pl.ID]
-	case pool.VendorBaidu:
-		client = s.Pools[pool.VendorBaidu][pl.ID]
-	default:
-		return minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	// 3. get client
+	client := s.getClient(pl)
+	if client == nil {
+		return minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
 	}
+	// 4. get physical object name
 	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
+	// 5. abort multipart upload
 	err = client.AbortMultipartUpload(ctx, pBucket, pObject, bucket, object, mp.PhysicalUploadID, opts)
 	if err != nil {
 		return minio.ErrorRespToObjectError(err, bucket, object)
 	}
+	// 6. delete multipart meta
 	_ = s.VBucketMgr.DeleteMultipart(bucket, uploadID)
 	return nil
 }
 
 // CompleteMultipartUpload completes ongoing multipart upload and finalizes object
-func (s *Store) CompleteMultipartUpload(ctx context.Context, bucket string, object string, uploadID string, uploadedParts []minio.CompletePart, opts minio.ObjectOptions) (oi minio.ObjectInfo, e error) {
+func (s *Store) CompleteMultipartUpload(ctx context.Context, bucket string, object string, uploadID string,
+	uploadedParts []minio.CompletePart, opts minio.ObjectOptions) (oi minio.ObjectInfo, e error) {
+	// 1. get multipart meta
 	mp, err := s.VBucketMgr.QueryMultipart(bucket, uploadID)
 	if err != nil {
-		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
+		return oi, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
 	}
+	// 2. get pool and physical bucket
 	pl, pBucket := s.VBucketMgr.GetPool(bucket), mp.PhysicalBucket
 	if pl == nil || len(pBucket) == 0 {
-		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
+		return oi, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
 	}
-	var client sdk.Client
-	switch pl.Vendor {
-	case pool.VendorAws:
-		client = s.Pools[pool.VendorAws][pl.ID]
-	case pool.VendorCeph:
-		client = s.Pools[pool.VendorCeph][pl.ID]
-	case pool.VendorBaidu:
-		client = s.Pools[pool.VendorBaidu][pl.ID]
-	default:
-		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	// 3. get client
+	client := s.getClient(pl)
+	if client == nil {
+		return oi, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
 	}
+	// 4. get physical object
 	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
-	fmt.Printf("-----------------CompleteMultipartUpload start------------------\n")
-	objInfo, err := client.CompleteMultipartUpload(ctx, pBucket, pObject, bucket, object, mp.PhysicalUploadID, uploadedParts, opts)
+	// 5. complete multipart upload
+	oi, err = client.CompleteMultipartUpload(ctx, pBucket, pObject, bucket, object, mp.PhysicalUploadID, uploadedParts, opts)
 	if err != nil {
-		fmt.Printf("-----------------CompleteMultipartUpload error:%s------------------\n", err)
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	fmt.Printf("-----------------CompleteMultipartUpload end:------------------\n")
-	// FIXME(yangchunxin): add object meta
+	// 6. delete multipart meta
 	_ = s.VBucketMgr.DeleteMultipart(bucket, uploadID)
-	// insert object meta
-	err = s.VBucketMgr.PutObjectMeta(pl.ID, pBucket, objInfo)
+	// 7. insert object meta
+	err = s.VBucketMgr.PutObjectMeta(pl.ID, pBucket, oi)
 	if err != nil {
-		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
+		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	return objInfo, nil
+	return oi, nil
 }
 
 // SetBucketPolicy sets policy on bucket
