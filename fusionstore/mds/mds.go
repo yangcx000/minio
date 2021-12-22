@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/minio/minio/fusionstore/mgs"
-	"github.com/minio/minio/fusionstore/utils"
 	"github.com/minio/minio/protos"
 )
 
@@ -45,71 +44,57 @@ func (m *Mds) DecodeFromPb(p *protos.Mds) {
 
 // Mgr xxx
 type Mgr struct {
-	MdsMap      map[string]*Mds
-	MdsServices map[string]*Service
+	mdsMap      map[string]*Mds
+	mdsServices map[string]*Service
 }
 
 // NewMgr xxx
-func NewMgr() (*Mgr, error) {
-	mgr := &Mgr{}
-	if err := mgr.init(); err != nil {
+func NewMgr() (m *Mgr, err error) {
+	m = &Mgr{}
+	if err = m.loadMds(); err != nil {
 		return nil, err
 	}
-	return mgr, nil
+	return m, nil
 }
 
-// Init xxx
-func (m *Mgr) init() error {
-	mdsList, err := m.ListMds()
-	if err != nil {
-		return err
+// Shutdown xxx
+func (m *Mgr) Shutdown() {
+	for _, srv := range m.mdsServices {
+		srv.Close()
 	}
-	m.MdsMap = make(map[string]*Mds, len(mdsList))
-	m.MdsServices = make(map[string]*Service, len(mdsList))
-	for _, v := range mdsList {
-		svc, err := NewService(v.Endpoint, 10)
-		if err != nil {
-			return err
-		}
-		m.MdsServices[v.ID] = svc
-		m.MdsMap[v.ID] = v
-	}
-	fmt.Println("/*--------------------------Mdss----------------------------*/")
-	for _, v := range m.MdsMap {
-		utils.PrettyPrint(v)
-	}
-	return nil
 }
 
 // GetService xxx
 func (m *Mgr) GetService(mdsID string) *Service {
-	return m.MdsServices[mdsID]
+	return m.mdsServices[mdsID]
 }
 
-// ListMds xxx
-func (m *Mgr) ListMds() ([]*Mds, error) {
+// loadMds xxx
+func (m *Mgr) loadMds() error {
 	resp, err := mgs.GlobalService.ListMds()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if resp.GetStatus().Code != protos.Code_OK {
-		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
+		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
-	mdsList := make([]*Mds, len(resp.GetMdsList()))
-	for i, v := range resp.GetMdsList() {
-		p := &Mds{}
-		p.DecodeFromPb(v)
-		mdsList[i] = p
+	m.mdsMap = make(map[string]*Mds, len(resp.GetMdsList()))
+	m.mdsServices = make(map[string]*Service, len(resp.GetMdsList()))
+	for _, v := range resp.GetMdsList() {
+		md := &Mds{}
+		md.DecodeFromPb(v)
+		svc, err := NewService(md.Endpoint, 10)
+		if err != nil {
+			return err
+		}
+		m.mdsServices[md.ID] = svc
+		m.mdsMap[md.ID] = md
 	}
-	return mdsList, nil
+	return nil
 }
 
-// SelectMds xxx
-func (m *Mgr) SelectMds(vbucket string) string {
-	_ = vbucket
+// AllocMdsByVBucket xxx
+func (m *Mgr) AllocMdsByVBucket(vbucket string) string {
 	// FIXME(yangchunxin): design algorithm
-	for mdsID := range m.MdsMap {
-		return mdsID
-	}
 	return ""
 }

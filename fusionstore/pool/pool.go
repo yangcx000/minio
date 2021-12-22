@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/minio/minio/fusionstore/mgs"
-	"github.com/minio/minio/fusionstore/utils"
 	"github.com/minio/minio/protos"
 )
 
@@ -51,15 +50,16 @@ type Credentials struct {
 
 // Pool xxx
 type Pool struct {
-	ID          string             `json:"id,omitempty"`
-	Name        string             `json:"name"`
-	Type        string             `json:"type"`
-	Vendor      string             `json:"vendor"`
-	Status      string             `json:"status,omitempty"`
-	Version     int                `json:"version,omitempty"`
-	Endpoint    string             `json:"endpoint"`
-	Creds       Credentials        `json:"creds"`
-	Buckets     map[string]*Bucket `json:"buckets"`
+	ID       string      `json:"id,omitempty"`
+	Name     string      `json:"name"`
+	Type     string      `json:"type"`
+	Vendor   string      `json:"vendor"`
+	Status   string      `json:"status,omitempty"`
+	Version  int         `json:"version,omitempty"`
+	Endpoint string      `json:"endpoint"`
+	Creds    Credentials `json:"creds"`
+	// id --> bucket
+	Buckets     map[string]*Bucket `json:"buckets,omitempty"`
 	CreatedTime string             `json:"createdtime,omitempty"`
 	UpdatedTime string             `json:"updatedtime,omitempty"`
 }
@@ -81,125 +81,85 @@ func (p *Pool) DecodeFromPb(pool *protos.Pool) {
 	p.UpdatedTime = pool.GetUpdatedTime()
 }
 
-// Init xxx
 func (p *Pool) init() error {
-	buckets, err := p.ListBuckets()
+	resp, err := mgs.GlobalService.ListBuckets(p.ID)
 	if err != nil {
 		return err
 	}
-	p.Buckets = make(map[string]*Bucket)
-	for _, b := range buckets {
+	if resp.GetStatus().Code != protos.Code_OK {
+		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
+	}
+	p.Buckets = make(map[string]*Bucket, len(resp.GetBucketList()))
+	for _, v := range resp.GetBucketList() {
+		b := &Bucket{}
+		b.DecodeFromPb(v)
 		p.Buckets[b.ID] = b
 	}
 	return nil
 }
 
-// ListBuckets xxx
-func (p *Pool) ListBuckets() ([]*Bucket, error) {
-	resp, err := mgs.GlobalService.ListBuckets(p.ID)
-	if err != nil {
-		return nil, err
-	}
-	if resp.GetStatus().Code != protos.Code_OK {
-		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
-	}
-	buckets := make([]*Bucket, len(resp.GetBucketList()))
-	for i, v := range resp.GetBucketList() {
-		b := &Bucket{}
-		b.DecodeFromPb(v)
-		buckets[i] = b
-	}
-	return buckets, nil
-}
-
-func (p *Pool) selectBucket() string {
-	// FIXME(yangchunxin): design algorithm
-	for _, v := range p.Buckets {
-		return v.Name
-	}
+func (p *Pool) allocBucket() string {
+	// FIXME(yangchunxin): xxx
 	return ""
 }
 
 // Mgr xxx
 type Mgr struct {
-	Pools map[string]*Pool
+	pools map[string]*Pool
 }
 
 // NewMgr xxx
-func NewMgr() (*Mgr, error) {
-	mgr := &Mgr{}
-	if err := mgr.init(); err != nil {
+func NewMgr() (m *Mgr, err error) {
+	m = &Mgr{}
+	if err = m.loadPools(); err != nil {
 		return nil, err
 	}
-	return mgr, nil
+	return m, nil
 }
 
-// Init xxx
-func (m *Mgr) init() error {
-	pools, err := m.ListPools()
+// loadPools xxx
+func (m *Mgr) loadPools() error {
+	// TODO(yangchunxin): add marker and limits
+	resp, err := mgs.GlobalService.ListPools()
 	if err != nil {
 		return err
 	}
-	m.Pools = make(map[string]*Pool, len(pools))
-	for _, v := range pools {
-		m.Pools[v.ID] = v
+	if resp.GetStatus().Code != protos.Code_OK {
+		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
-	fmt.Println("/*--------------------------Pools----------------------------*/")
-	// XXX(yangchunxin): log it
-	for _, v := range m.Pools {
-		utils.PrettyPrint(v)
+	m.pools = make(map[string]*Pool, len(resp.GetPoolList()))
+	for _, v := range resp.GetPoolList() {
+		p := &Pool{}
+		p.DecodeFromPb(v)
+		if err = p.init(); err != nil {
+			return err
+		}
+		m.pools[p.ID] = p
 	}
 	return nil
 }
 
+// GetPoolMap xxx
+func (m *Mgr) GetPoolMap() map[string]*Pool {
+	return m.pools
+}
+
 // GetPool xxx
-func (m *Mgr) GetPool(pool string) *Pool {
-	return m.Pools[pool]
+func (m *Mgr) GetPool(pID string) *Pool {
+	return m.pools[pID]
 }
 
-// ListPools xxx
-func (m *Mgr) ListPools() ([]*Pool, error) {
-	resp, err := mgs.GlobalService.ListPools()
-	if err != nil {
-		return nil, err
-	}
-	if resp.GetStatus().Code != protos.Code_OK {
-		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
-	}
-	pools := make([]*Pool, len(resp.GetPoolList()))
-	for i, v := range resp.GetPoolList() {
-		p := &Pool{}
-		p.DecodeFromPb(v)
-		if err = p.init(); err != nil {
-			return nil, err
-		}
-		pools[i] = p
-	}
-	return pools, nil
+// AllocPoolByVBucket xxx
+func (m *Mgr) AllocPoolByVBucket(vbucket string) string {
+	// FIXME(yangchunxin): xxxx
+	return ""
 }
 
-var poolIndex int
-
-// SelectPool xxx
-func (m *Mgr) SelectPool(vbucket string) string {
-	// XXX: design algorithm
-	poolIDs := make([]string, len(m.Pools))
-	i := 0
-	for k := range m.Pools {
-		poolIDs[i] = k
-		i++
-	}
-	c := poolIndex % len(poolIDs)
-	poolIndex++
-	return poolIDs[c]
-}
-
-// SelectBucket xxx
-func (m *Mgr) SelectBucket(pool string) string {
-	// XXX: pool has cached
-	p := m.Pools[pool]
-	if p == nil {
+// AllocBucket xxx
+func (m *Mgr) AllocBucket(pID string) string {
+	p, exists := m.pools[pID]
+	if !exists {
 		return ""
 	}
-	return p.selectBucket()
+	return p.allocBucket()
 }

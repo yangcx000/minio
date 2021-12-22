@@ -16,24 +16,18 @@ import (
 	"github.com/minio/minio-go/v7/pkg/s3utils"
 	"github.com/minio/minio-go/v7/pkg/tags"
 	minio "github.com/minio/minio/cmd"
-	"github.com/minio/minio/fusionstore/mgs"
-	"github.com/minio/minio/fusionstore/object"
-	"github.com/minio/minio/fusionstore/pool"
-	"github.com/minio/minio/fusionstore/sdk"
-	"github.com/minio/minio/fusionstore/vbucket"
+	"github.com/minio/minio/fusionstore/cluster"
 	"github.com/minio/pkg/bucket/policy"
 )
 
-const (
-	serviceTimeout = 10
-)
+func getPhysicalObject(vbucket, object string) string {
+	return fmt.Sprintf("%s/%s", vbucket, object)
+}
 
 // Store implements gateway apis.
 type Store struct {
 	minio.GatewayUnsupported
-	// vendor --> {pool_id --> client}
-	Pools      map[string]map[string]sdk.Client
-	VBucketMgr *vbucket.Mgr
+	Cluster *cluster.Cluster
 
 	HTTPClient *http.Client
 	Metrics    *minio.BackendMetrics
@@ -57,67 +51,16 @@ func New(mgsAddr string) (*Store, error) {
 		},
 		//debug: true,
 	}
-	err := s.init(mgsAddr, t)
+	err := s.initImpl(mgsAddr, t)
 	return s, err
 }
 
-func (s *Store) init(mgsAddr string, transport http.RoundTripper) error {
-	err := mgs.NewService(mgsAddr, serviceTimeout)
+func (s *Store) initImpl(mgsAddr string, transport http.RoundTripper) (err error) {
+	s.Cluster, err = cluster.New(mgsAddr, transport)
 	if err != nil {
 		return err
 	}
-	if s.VBucketMgr, err = vbucket.NewMgr(); err != nil {
-		return err
-	}
-	if err = s.initClients(transport); err != nil {
-		return err
-	}
 	return nil
-}
-
-func (s *Store) initClients(transport http.RoundTripper) error {
-	s.Pools = make(map[string]map[string]sdk.Client)
-	for k, v := range s.VBucketMgr.PoolMgr.Pools {
-		_, exists := s.Pools[v.Vendor]
-		if !exists {
-			s.Pools[v.Vendor] = make(map[string]sdk.Client)
-		}
-		var (
-			c   sdk.Client
-			err error
-		)
-		switch v.Vendor {
-		case pool.VendorAws:
-			c, err = sdk.NewS3Client(v.Endpoint, v.Creds.AccessKey, v.Creds.SecretKey,
-				transport)
-		case pool.VendorCeph:
-			c, err = sdk.NewS3Client(v.Endpoint, v.Creds.AccessKey, v.Creds.SecretKey,
-				transport)
-		case pool.VendorBaidu:
-			c, err = sdk.NewBosClient(v.Endpoint, v.Creds.AccessKey, v.Creds.SecretKey)
-		default:
-			return fmt.Errorf("pool %q has unknown vendor type %q", k, v.Vendor)
-		}
-		if err != nil {
-			return err
-		}
-		s.Pools[v.Vendor][k] = c
-	}
-	return nil
-}
-
-func (s *Store) getClient(pl *pool.Pool) sdk.Client {
-	var client sdk.Client
-	switch pl.Vendor {
-	case pool.VendorAws:
-		client = s.Pools[pool.VendorAws][pl.ID]
-	case pool.VendorCeph:
-		client = s.Pools[pool.VendorCeph][pl.ID]
-	case pool.VendorBaidu:
-		client = s.Pools[pool.VendorBaidu][pl.ID]
-	default:
-	}
-	return client
 }
 
 // GetMetrics returns this gateway's metrics
@@ -128,29 +71,26 @@ func (s *Store) GetMetrics(ctx context.Context) (*minio.BackendMetrics, error) {
 // Shutdown saves any gateway metadata to disk
 // if necessary and reload upon next restart.
 func (s *Store) Shutdown(ctx context.Context) error {
+	s.Cluster.Shutdown()
 	return nil
 }
 
 // StorageInfo is not relevant to S3 backend.
 func (s *Store) StorageInfo(ctx context.Context) (si minio.StorageInfo, _ []error) {
-	// TODO(yangchunxin): check bucket exists using probe bucket on every pool
 	si.Backend.Type = madmin.Gateway
 	si.Backend.GatewayOnline = true
 	return si, nil
 }
 
-/*****************************************Bucket Operations***************************************/
-
 // MakeBucketWithLocation creates a new bucket on S3 backend.
-func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string,
-	opts minio.BucketOptions) error {
+func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string, opts minio.BucketOptions) error {
 	if opts.LockEnabled || opts.VersioningEnabled {
 		return minio.NotImplemented{}
 	}
 	if s3utils.CheckValidBucketName(bucket) != nil {
 		return minio.BucketNameInvalid{Bucket: bucket}
 	}
-	err := s.VBucketMgr.MakeVBucket(bucket, opts.Location)
+	err := s.Cluster.CreateVBucket(bucket, opts.Location)
 	if err != nil {
 		return minio.ErrorRespToObjectError(err, bucket)
 	}
@@ -159,46 +99,34 @@ func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string,
 
 // GetBucketInfo gets bucket metadata.
 func (s *Store) GetBucketInfo(ctx context.Context, bucket string) (bi minio.BucketInfo, e error) {
-	vb, err := s.VBucketMgr.GetVBucketInfo(bucket)
+	bucketInfo, err := s.Cluster.GetVBucketInfo(bucket)
 	if err != nil {
 		return bi, minio.ErrorRespToObjectError(err)
 	}
-	if vb == nil {
+	if bucketInfo == nil {
 		return bi, minio.BucketNotFound{Bucket: bucket}
 	}
-	return minio.BucketInfo{
-		Name:    vb.Name,
-		Created: vb.CreatedTime,
-	}, nil
+	return *bucketInfo, nil
 }
 
 // ListBuckets lists all buckets.
 func (s *Store) ListBuckets(ctx context.Context) ([]minio.BucketInfo, error) {
-	vbs, err := s.VBucketMgr.ListVBuckets()
+	bis, err := s.Cluster.ListVBuckets()
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err)
 	}
-	bis := make([]minio.BucketInfo, len(vbs))
-	for i, v := range vbs {
-		bis[i] = minio.BucketInfo{
-			Name:    v.Name,
-			Created: v.CreatedTime,
-		}
-	}
-	return bis, err
+	return bis, nil
 }
 
 // DeleteBucket deletes one bucket.
 func (s *Store) DeleteBucket(ctx context.Context, bucket string,
 	opts minio.DeleteBucketOptions) error {
-	err := s.VBucketMgr.DeleteVBucket(bucket)
+	err := s.Cluster.DeleteVBucket(bucket)
 	if err != nil {
 		return minio.ErrorRespToObjectError(err, bucket)
 	}
 	return nil
 }
-
-/*****************************************Object Operations***************************************/
 
 // ListObjects lists all blobs in S3 bucket filtered by prefix
 func (s *Store) ListObjects(ctx context.Context, bucket string, prefix string, marker string,
@@ -211,19 +139,11 @@ func (s *Store) ListObjects(ctx context.Context, bucket string, prefix string, m
 	if err := s3utils.CheckValidObjectNamePrefix(prefix); err != nil {
 		return minio.ListObjectsInfo{}, err
 	}
-	lop := &object.ListObjectsParam{
-		VBucket:   bucket,
-		Prefix:    prefix,
-		Marker:    marker,
-		Delimiter: delimiter,
-		Limits:    maxKeys,
-	}
-	results, err := s.VBucketMgr.ListObjects(lop)
-	//results, err := s.VBucketMgr.ListObjects(bucket, prefix, marker, delimiter, maxKeys)
+	loi, err := s.Cluster.ListObjects(bucket, prefix, marker, delimiter, maxKeys)
 	if err != nil {
 		return loi, minio.ErrorRespToObjectError(err, bucket)
 	}
-	return results, nil
+	return loi, nil
 }
 
 // ListObjectsV2 lists all blobs in S3 bucket filtered by prefix
@@ -236,23 +156,22 @@ func (s *Store) ListObjectsV2(ctx context.Context, bucket, prefix, continuationT
 // GetObjectNInfo - returns object info and locked object ReadCloser
 func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *minio.HTTPRangeSpec, h http.Header, lockType minio.LockType,
 	opts minio.ObjectOptions) (gr *minio.GetObjectReader, err error) {
-	// 1. get object info
 	oi, err := s.GetObjectInfo(ctx, bucket, object, opts)
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	// 2. get pool and physical bucket
-	pl, pBucket := s.VBucketMgr.GetObjectPoolAndBucket(bucket, object)
-	if pl == nil || len(pBucket) == 0 {
-		return nil, minio.ErrorRespToObjectError(errors.New("object not found"), bucket, object)
+	pool, pBucket, err := s.Cluster.GetObjectPoolAndBucket(bucket, object)
+	if err != nil {
+		return nil, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	// 3. get client of pool
-	client := s.getClient(pl)
+	if pool == nil || len(pBucket) == 0 {
+		return nil, minio.ErrorRespToObjectError(errors.New("object/pool not found"), bucket, object)
+	}
+	client := s.Cluster.GetClient(pool)
 	if client == nil {
 		return nil, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
 	}
-	// 4. get physical object name
-	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
+	pObject := getPhysicalObject(bucket, object)
 	fn, off, length, err := minio.NewGetObjectReader(rs, oi, opts)
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err, bucket, object)
@@ -271,7 +190,7 @@ func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *m
 // GetObjectInfo reads object info and replies back ObjectInfo
 func (s *Store) GetObjectInfo(ctx context.Context, bucket string, object string,
 	opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	oi, err := s.VBucketMgr.GetObjectMeta(bucket, object)
+	oi, err := s.Cluster.GetObjectMeta(bucket, object)
 	if err != nil {
 		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
 	}
@@ -281,25 +200,27 @@ func (s *Store) GetObjectInfo(ctx context.Context, bucket string, object string,
 // PutObject creates a new object with the incoming data,
 func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *minio.PutObjReader,
 	opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	// 1. get pool and physical bucket name
-	pl, pBucket := s.VBucketMgr.GetPoolAndBucket(bucket, object)
-	if pl == nil || len(pBucket) == 0 {
+	pool, err := s.Cluster.GetPool(bucket)
+	if err != nil {
+		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	if pool == nil {
+		return objInfo, minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	}
+	pBucket := s.Cluster.AllocPhysicalBucket(pool.ID)
+	if len(pBucket) == 0 {
 		return objInfo, minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
 	}
-	// 2. get client of pool
-	client := s.getClient(pl)
+	client := s.Cluster.GetClient(pool)
 	if client == nil {
 		return objInfo, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
 	}
-	// 3. get physical object name
-	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
-	// 4. put object
+	pObject := getPhysicalObject(bucket, object)
 	oi, err := client.PutObject(ctx, pBucket, pObject, bucket, object, r, opts)
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	// 5. insert object meta
-	err = s.VBucketMgr.PutObjectMeta(pl.ID, pBucket, oi)
+	err = s.Cluster.PutObjectMeta(pool.ID, pBucket, oi)
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
@@ -343,24 +264,23 @@ func (s *Store) CopyObject(ctx context.Context, srcBucket string, srcObject stri
 // DeleteObject deletes a blob in bucket
 func (s *Store) DeleteObject(ctx context.Context, bucket string, object string,
 	opts minio.ObjectOptions) (minio.ObjectInfo, error) {
-	// 1. get pool and physical bucket name
-	pl, pBucket := s.VBucketMgr.GetObjectPoolAndBucket(bucket, object)
-	if pl == nil || len(pBucket) == 0 {
-		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
+	pool, pBucket, err := s.Cluster.GetObjectPoolAndBucket(bucket, object)
+	if err != nil {
+		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	// 2. get client
-	client := s.getClient(pl)
+	if pool == nil || len(pBucket) == 0 {
+		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(errors.New("bucket/pool not found"), bucket, object)
+	}
+	client := s.Cluster.GetClient(pool)
 	if client == nil {
 		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
 	}
-	// 3. get physical object name
-	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
+	pObject := getPhysicalObject(bucket, object)
 	oi, err := client.DeleteObject(ctx, pBucket, pObject, bucket, object, opts)
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	// 4. delete object meta
-	err = s.VBucketMgr.DeleteObjectMeta(bucket, object)
+	err = s.Cluster.DeleteObjectMeta(bucket, object)
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
@@ -399,25 +319,27 @@ func (s *Store) ListMultipartUploads(ctx context.Context, bucket string, prefix 
 
 // NewMultipartUpload upload object in multiple parts
 func (s *Store) NewMultipartUpload(ctx context.Context, bucket string, object string, o minio.ObjectOptions) (uploadID string, err error) {
-	// 1. get pool and physical bucket name
-	pl, pBucket := s.VBucketMgr.GetPoolAndBucket(bucket, object)
-	if pl == nil || len(pBucket) == 0 {
+	pool, err := s.Cluster.GetPool(bucket)
+	if err != nil {
+		return "", minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	if pool == nil {
+		return "", minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	}
+	pBucket := s.Cluster.AllocPhysicalBucket(pool.ID)
+	if len(pBucket) == 0 {
 		return "", minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
 	}
-	// 2. get client
-	client := s.getClient(pl)
+	client := s.Cluster.GetClient(pool)
 	if client == nil {
 		return "", minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
 	}
-	// 3. get physical object name
-	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
-	// 4. new multipart upload
+	pObject := getPhysicalObject(bucket, object)
 	PhysicUploadID, err := client.NewMultipartUpload(ctx, pBucket, pObject, bucket, object, o)
 	if err != nil {
 		return "", minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	// 5. create multipart meta
-	uploadID, err = s.VBucketMgr.CreateMultipart(pBucket, pObject, bucket, object, PhysicUploadID)
+	uploadID, err = s.Cluster.CreateMultipart(pBucket, pObject, bucket, object, PhysicUploadID)
 	if err != nil {
 		return "", minio.ErrorRespToObjectError(err, bucket, object)
 	}
@@ -427,25 +349,13 @@ func (s *Store) NewMultipartUpload(ctx context.Context, bucket string, object st
 // PutObjectPart puts a part of object in bucket
 func (s *Store) PutObjectPart(ctx context.Context, bucket string, object string, uploadID string, partID int,
 	r *minio.PutObjReader, opts minio.ObjectOptions) (pi minio.PartInfo, e error) {
-	// 1. get multipart meta
-	mp, err := s.VBucketMgr.QueryMultipart(bucket, uploadID)
+	mc, err := s.Cluster.GetMultipartCommon(bucket, uploadID)
 	if err != nil {
-		return minio.PartInfo{}, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
+		return pi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	// 2. get pool and physical bucket name
-	pl, pBucket := s.VBucketMgr.GetPool(bucket), mp.PhysicalBucket
-	if pl == nil || len(pBucket) == 0 {
-		return minio.PartInfo{}, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
-	}
-	// 3. get client
-	client := s.getClient(pl)
-	if client == nil {
-		return pi, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
-	}
-	// 4. get physical object name
-	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
-	// 5. put object part
-	pi, err = client.PutObjectPart(ctx, pBucket, pObject, bucket, object, mp.PhysicalUploadID, partID, r, opts)
+	pObject := getPhysicalObject(bucket, object)
+	pi, err = mc.Client.PutObjectPart(ctx, mc.Multipart.PhysicalBucket, pObject, bucket,
+		object, mc.Multipart.PhysicalUploadID, partID, r, opts)
 	if err != nil {
 		return pi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
@@ -500,25 +410,13 @@ func (s *Store) GetMultipartInfo(ctx context.Context, bucket, object, uploadID s
 // ListObjectParts returns all object parts for specified object in specified bucket
 func (s *Store) ListObjectParts(ctx context.Context, bucket string, object string, uploadID string, partNumberMarker int,
 	maxParts int, opts minio.ObjectOptions) (lpi minio.ListPartsInfo, e error) {
-	// 1. get multipart meta
-	mp, err := s.VBucketMgr.QueryMultipart(bucket, uploadID)
+	mc, err := s.Cluster.GetMultipartCommon(bucket, uploadID)
 	if err != nil {
-		return lpi, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
+		return lpi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	// 2. get pool and physical bucket
-	pl, pBucket := s.VBucketMgr.GetPool(bucket), mp.PhysicalBucket
-	if pl == nil || len(pBucket) == 0 {
-		return lpi, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
-	}
-	// 3. get client
-	client := s.getClient(pl)
-	if client == nil {
-		return lpi, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
-	}
-	// 4. get physical object
-	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
-	// 5. list object parts
-	lpi, err = client.ListObjectParts(ctx, pBucket, pObject, bucket, object, mp.PhysicalUploadID, partNumberMarker, maxParts, opts)
+	pObject := getPhysicalObject(bucket, object)
+	lpi, err = mc.Client.ListObjectParts(ctx, mc.Multipart.PhysicalBucket, pObject, bucket,
+		object, mc.Multipart.PhysicalUploadID, partNumberMarker, maxParts, opts)
 	if err != nil {
 		return lpi, err
 	}
@@ -527,62 +425,34 @@ func (s *Store) ListObjectParts(ctx context.Context, bucket string, object strin
 
 // AbortMultipartUpload aborts a ongoing multipart upload
 func (s *Store) AbortMultipartUpload(ctx context.Context, bucket string, object string, uploadID string, opts minio.ObjectOptions) error {
-	// 1. get multipart meta
-	mp, err := s.VBucketMgr.QueryMultipart(bucket, uploadID)
-	if err != nil {
-		return minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
-	}
-	// 2. get pool and physical bucket
-	pl, pBucket := s.VBucketMgr.GetPool(bucket), mp.PhysicalBucket
-	if pl == nil || len(pBucket) == 0 {
-		return minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
-	}
-	// 3. get client
-	client := s.getClient(pl)
-	if client == nil {
-		return minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
-	}
-	// 4. get physical object name
-	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
-	// 5. abort multipart upload
-	err = client.AbortMultipartUpload(ctx, pBucket, pObject, bucket, object, mp.PhysicalUploadID, opts)
+	mc, err := s.Cluster.GetMultipartCommon(bucket, uploadID)
 	if err != nil {
 		return minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	// 6. delete multipart meta
-	_ = s.VBucketMgr.DeleteMultipart(bucket, uploadID)
+	pObject := getPhysicalObject(bucket, object)
+	err = mc.Client.AbortMultipartUpload(ctx, mc.Multipart.PhysicalBucket, pObject, bucket, object, mc.Multipart.PhysicalUploadID, opts)
+	if err != nil {
+		return minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	_ = s.Cluster.DeleteMultipart(bucket, uploadID)
 	return nil
 }
 
 // CompleteMultipartUpload completes ongoing multipart upload and finalizes object
 func (s *Store) CompleteMultipartUpload(ctx context.Context, bucket string, object string, uploadID string,
 	uploadedParts []minio.CompletePart, opts minio.ObjectOptions) (oi minio.ObjectInfo, e error) {
-	// 1. get multipart meta
-	mp, err := s.VBucketMgr.QueryMultipart(bucket, uploadID)
-	if err != nil {
-		return oi, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
-	}
-	// 2. get pool and physical bucket
-	pl, pBucket := s.VBucketMgr.GetPool(bucket), mp.PhysicalBucket
-	if pl == nil || len(pBucket) == 0 {
-		return oi, minio.ErrorRespToObjectError(errors.New("bucket not found"), bucket, object)
-	}
-	// 3. get client
-	client := s.getClient(pl)
-	if client == nil {
-		return oi, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
-	}
-	// 4. get physical object
-	pObject := s.VBucketMgr.GetObjectKey(bucket, object)
-	// 5. complete multipart upload
-	oi, err = client.CompleteMultipartUpload(ctx, pBucket, pObject, bucket, object, mp.PhysicalUploadID, uploadedParts, opts)
+	mc, err := s.Cluster.GetMultipartCommon(bucket, uploadID)
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	// 6. delete multipart meta
-	_ = s.VBucketMgr.DeleteMultipart(bucket, uploadID)
-	// 7. insert object meta
-	err = s.VBucketMgr.PutObjectMeta(pl.ID, pBucket, oi)
+	pObject := getPhysicalObject(bucket, object)
+	oi, err = mc.Client.CompleteMultipartUpload(ctx, mc.Multipart.PhysicalBucket, pObject, bucket,
+		object, mc.Multipart.PhysicalUploadID, uploadedParts, opts)
+	if err != nil {
+		return oi, minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	_ = s.Cluster.DeleteMultipart(bucket, uploadID)
+	//err = s.Cluster.PutObjectMeta(pl.ID, mc.Multipart.PhysicalBucket, oi)
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}

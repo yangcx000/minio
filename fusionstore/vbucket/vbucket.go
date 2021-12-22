@@ -10,17 +10,16 @@ import (
 	"fmt"
 	"time"
 
-	minio "github.com/minio/minio/cmd"
 	"github.com/minio/minio/fusionstore/mds"
 	"github.com/minio/minio/fusionstore/mgs"
 	"github.com/minio/minio/fusionstore/multipart"
 	"github.com/minio/minio/fusionstore/object"
-	"github.com/minio/minio/fusionstore/pool"
-	"github.com/minio/minio/fusionstore/utils"
 	"github.com/minio/minio/protos"
 )
 
-const scanLimits = 1000
+const (
+	scanLimits = 1000
+)
 
 // VBucket xxx
 type VBucket struct {
@@ -62,30 +61,26 @@ func (v *VBucket) getObject(object string) *object.Object {
 
 // Mgr xxx
 type Mgr struct {
-	PoolMgr  *pool.Mgr
-	MdsMgr   *mds.Mgr
+	MdsMgr *mds.Mgr
+	// name --> vbucket
 	VBuckets map[string]*VBucket
 }
 
 // NewMgr xxx
-func NewMgr() (*Mgr, error) {
-	mgr := &Mgr{}
-	if err := mgr.init(); err != nil {
+func NewMgr() (m *Mgr, err error) {
+	m = &Mgr{}
+	if err = m.loadVBuckets(); err != nil {
 		return nil, err
 	}
-	return mgr, nil
+	if m.MdsMgr, err = mds.NewMgr(); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
-func (m *Mgr) init() error {
-	var err error
-	if m.PoolMgr, err = pool.NewMgr(); err != nil {
-		return err
-	}
-	if m.MdsMgr, err = mds.NewMgr(); err != nil {
-		return err
-	}
-	m.loadVBuckets()
-	return nil
+// Shutdown xxx
+func (m *Mgr) Shutdown() {
+	m.MdsMgr.Shutdown()
 }
 
 func (m *Mgr) loadVBuckets() error {
@@ -112,7 +107,7 @@ func (m *Mgr) getVBucket(vbucket string) *VBucket {
 	return vb
 }
 
-/* vbucket apis */
+/*vbucket apis*/
 func (m *Mgr) createVBucket(vbucket, location, pool, mds string) error {
 	resp, err := mgs.GlobalService.CreateVBucket(vbucket, location, pool, mds)
 	if err != nil {
@@ -168,71 +163,7 @@ func (m *Mgr) listVBuckets() ([]*VBucket, error) {
 	return vbs, nil
 }
 
-/* end vbucket apis */
-
-// MakeVBucket xxx
-func (m *Mgr) MakeVBucket(vbucket, location string) error {
-	// query mds directly
-	vb, err := m.queryVBucket(vbucket)
-	if err != nil {
-		return err
-	}
-	if vb != nil {
-		return fmt.Errorf("bucket %q already exists", vbucket)
-	}
-	pool, mds := m.PoolMgr.SelectPool(vbucket), m.MdsMgr.SelectMds(vbucket)
-	if len(pool) == 0 || len(mds) == 0 {
-		return errors.New("couldn't alloc pool or mds")
-	}
-	err = m.createVBucket(vbucket, location, pool, mds)
-	if err != nil {
-		return err
-	}
-	// query and add vbucket to cache
-	_ = m.getVBucket(vbucket)
-	return nil
-}
-
-// DeleteVBucket xxx
-func (m *Mgr) DeleteVBucket(vbucket string) error {
-	err := m.deleteVBucket(vbucket)
-	if err != nil {
-		return err
-	}
-	delete(m.VBuckets, vbucket)
-	return nil
-}
-
-// GetVBucketInfo xxx
-func (m *Mgr) GetVBucketInfo(vbucket string) (*VBucket, error) {
-	// query mds directly
-	return m.queryVBucket(vbucket)
-}
-
-// ListVBuckets xxx
-func (m *Mgr) ListVBuckets() ([]*VBucket, error) {
-	return m.listVBuckets()
-}
-
-// GetPoolAndBucket xxx
-func (m *Mgr) GetPoolAndBucket(vbucket, object string) (*pool.Pool, string) {
-	pBucket := ""
-	vb := m.getVBucket(vbucket)
-	if vb == nil {
-		return nil, pBucket
-	}
-	pBucket = m.PoolMgr.SelectBucket(vb.Pool)
-	return m.PoolMgr.GetPool(vb.Pool), pBucket
-}
-
-// GetPool xxx
-func (m *Mgr) GetPool(vbucket string) *pool.Pool {
-	vb := m.getVBucket(vbucket)
-	if vb == nil {
-		return nil
-	}
-	return m.PoolMgr.GetPool(vb.Pool)
-}
+/* vbucket apis */
 
 /* object apis */
 func (m *Mgr) putObject(obj *object.Object) error {
@@ -311,7 +242,9 @@ func (m *Mgr) listObjects(lop *object.ListObjectsParam) (*object.ListObjectsResu
 	return lor, nil
 }
 
-// multipart apis
+// end object apis
+
+// begin multipart apis
 func (m *Mgr) createMultipart(mp *multipart.Multipart) (string, error) {
 	// FIXME(yangchunxin): multi clients upload the same object by multipart ??
 	vb := m.getVBucket(mp.VBucket)
@@ -387,61 +320,57 @@ func (m *Mgr) listMultiparts(vbucket, marker string, numMultiparts int) ([]*mult
 	return mps, nextMarker, nil
 }
 
-// PutObjectMeta xxx
-func (m *Mgr) PutObjectMeta(pID, pBucket string, objInfo minio.ObjectInfo) error {
-	timeNow := utils.GetCurrentTime()
-	obj := object.Object{
-		Name:            objInfo.Name,
-		VBucket:         objInfo.Bucket,
-		Pool:            pID,
-		Bucket:          pBucket,
-		Etag:            objInfo.ETag,
-		InnerEtag:       objInfo.InnerETag,
-		VersionID:       objInfo.VersionID,
-		ContentType:     objInfo.ContentType,
-		ContentEncoding: objInfo.ContentEncoding,
-		StorageClass:    objInfo.StorageClass,
-		UserTags:        objInfo.UserTags,
-		Size:            objInfo.Size,
-		IsDir:           objInfo.IsDir,
-		IsLatest:        objInfo.IsLatest,
-		DeleteMarker:    objInfo.DeleteMarker,
-		RestoreOngoing:  objInfo.RestoreOngoing,
-		ModTime:         timeNow,
-		AccTime:         timeNow,
-		Expires:         objInfo.Expires,
-		RestoreExpires:  objInfo.RestoreExpires,
+// VBucketExists xxx
+func (m *Mgr) VBucketExists(vbucketName string) (bool, error) {
+	vb, err := m.queryVBucket(vbucketName)
+	if err != nil {
+		return false, err
 	}
-	return m.putObject(&obj)
+	if vb != nil {
+		return true, nil
+	}
+	return false, nil
+}
+
+// CreateVBucket xxx
+func (m *Mgr) CreateVBucket(vbucket, location, poolID, mdsID string) error {
+	err := m.createVBucket(vbucket, location, poolID, mdsID)
+	if err != nil {
+		return err
+	}
+	// query and add vbucket to cache
+	//_ = m.getVBucket(vbucket)
+	return nil
+}
+
+// DeleteVBucket xxx
+func (m *Mgr) DeleteVBucket(vbucket string) error {
+	err := m.deleteVBucket(vbucket)
+	if err != nil {
+		return err
+	}
+	//delete(m.VBuckets, vbucket)
+	return nil
+}
+
+// QueryVBucket xxx
+func (m *Mgr) QueryVBucket(vbucket string) (*VBucket, error) {
+	return m.queryVBucket(vbucket)
+}
+
+// ListVBuckets xxx
+func (m *Mgr) ListVBuckets() ([]*VBucket, error) {
+	return m.listVBuckets()
+}
+
+// PutObjectMeta xxx
+func (m *Mgr) PutObjectMeta(obj *object.Object) error {
+	return m.putObject(obj)
 }
 
 // GetObjectMeta xxx
-func (m *Mgr) GetObjectMeta(vbucket, object string) (minio.ObjectInfo, error) {
-	obj, err := m.getObject(vbucket, object)
-	if err != nil {
-		return minio.ObjectInfo{}, err
-	}
-	objInfo := minio.ObjectInfo{
-		Name:            obj.Name,
-		Bucket:          obj.VBucket,
-		ETag:            obj.Etag,
-		InnerETag:       obj.InnerEtag,
-		VersionID:       obj.VersionID,
-		ContentType:     obj.ContentType,
-		ContentEncoding: obj.ContentEncoding,
-		StorageClass:    obj.StorageClass,
-		UserTags:        obj.UserTags,
-		Size:            obj.Size,
-		IsDir:           obj.IsDir,
-		IsLatest:        obj.IsLatest,
-		DeleteMarker:    obj.DeleteMarker,
-		RestoreOngoing:  obj.RestoreOngoing,
-		ModTime:         obj.ModTime,
-		AccTime:         obj.AccTime,
-		Expires:         obj.Expires,
-		RestoreExpires:  obj.RestoreExpires,
-	}
-	return objInfo, nil
+func (m *Mgr) GetObjectMeta(vbucket, object string) (*object.Object, error) {
+	return m.getObject(vbucket, object)
 }
 
 // DeleteObjectMeta xxx
@@ -450,60 +379,8 @@ func (m *Mgr) DeleteObjectMeta(vbucket, object string) error {
 }
 
 // ListObjects xxx
-func (m *Mgr) ListObjects(lop *object.ListObjectsParam) (minio.ListObjectsInfo, error) {
-	lor, err := m.listObjects(lop)
-	if err != nil {
-		return minio.ListObjectsInfo{}, err
-	}
-	objInfos := make([]minio.ObjectInfo, len(lor.Objects))
-	for i, obj := range lor.Objects {
-		objInfo := minio.ObjectInfo{
-			Name:            obj.Name,
-			Bucket:          obj.VBucket,
-			ETag:            obj.Etag,
-			InnerETag:       obj.InnerEtag,
-			VersionID:       obj.VersionID,
-			ContentType:     obj.ContentType,
-			ContentEncoding: obj.ContentEncoding,
-			StorageClass:    obj.StorageClass,
-			UserTags:        obj.UserTags,
-			Size:            obj.Size,
-			IsDir:           obj.IsDir,
-			IsLatest:        obj.IsLatest,
-			DeleteMarker:    obj.DeleteMarker,
-			RestoreOngoing:  obj.RestoreOngoing,
-			ModTime:         obj.ModTime,
-			AccTime:         obj.AccTime,
-			Expires:         obj.Expires,
-			RestoreExpires:  obj.RestoreExpires,
-		}
-		objInfos[i] = objInfo
-	}
-	isTruncated := false
-	if len(lor.NextMarker) != 0 {
-		isTruncated = true
-	}
-	return minio.ListObjectsInfo{
-		IsTruncated: isTruncated,
-		Objects:     objInfos,
-		NextMarker:  lor.NextMarker,
-		Prefixes:    lor.CommonPrefixs,
-	}, nil
-}
-
-// GetObjectPoolAndBucket xxx
-func (m *Mgr) GetObjectPoolAndBucket(vbucket, object string) (*pool.Pool, string) {
-	obj, err := m.getObject(vbucket, object)
-	if err != nil {
-		return nil, ""
-	}
-	return m.PoolMgr.GetPool(obj.Pool), obj.Bucket
-}
-
-// GetObjectKey xxx
-func (m *Mgr) GetObjectKey(vbucket, object string) string {
-	// add vbucket prefix
-	return fmt.Sprintf("%s/%s", vbucket, object)
+func (m *Mgr) ListObjects(lop *object.ListObjectsParam) (*object.ListObjectsResult, error) {
+	return m.listObjects(lop)
 }
 
 // CreateMultipart xxx
@@ -526,4 +403,9 @@ func (m *Mgr) QueryMultipart(bucket, uploadID string) (*multipart.Multipart, err
 //DeleteMultipart xxx
 func (m *Mgr) DeleteMultipart(bucket, uploadID string) error {
 	return m.deleteMultipart(bucket, uploadID)
+}
+
+// AllocMdsByVBucket xxx
+func (m *Mgr) AllocMdsByVBucket(vbucket string) string {
+	return m.MdsMgr.AllocMdsByVBucket(vbucket)
 }
