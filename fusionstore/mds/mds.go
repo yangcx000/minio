@@ -93,8 +93,8 @@ func (m *Mgr) loadMds() error {
 	return nil
 }
 
-// AllocMdsByVBucket xxx
-func (m *Mgr) AllocMdsByVBucket(vbucket string) string {
-	// FIXME(yangchunxin): design algorithm
+// AllocateMds xxx
+func (m *Mgr) AllocateMds(vbucket string) string {
+	// FIXME(yangchunxin): select one mds
 	return ""
 }

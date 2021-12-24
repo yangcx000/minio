@@ -83,30 +83,6 @@ func (m *Mgr) Shutdown() {
 	m.MdsMgr.Shutdown()
 }
 
-func (m *Mgr) loadVBuckets() error {
-	vbs, err := m.ListVBuckets()
-	if err != nil {
-		return err
-	}
-	m.VBuckets = make(map[string]*VBucket, len(vbs))
-	for _, v := range vbs {
-		m.VBuckets[v.Name] = v
-	}
-	return nil
-}
-
-func (m *Mgr) getVBucket(vbucket string) *VBucket {
-	vb, exists := m.VBuckets[vbucket]
-	if exists {
-		return vb
-	}
-	vb, _ = m.queryVBucket(vbucket)
-	if vb != nil {
-		m.VBuckets[vb.Name] = vb
-	}
-	return vb
-}
-
 /*vbucket apis*/
 func (m *Mgr) createVBucket(vbucket, location, pool, mds string) error {
 	resp, err := mgs.GlobalService.CreateVBucket(vbucket, location, pool, mds)
@@ -320,6 +296,30 @@ func (m *Mgr) listMultiparts(vbucket, marker string, numMultiparts int) ([]*mult
 	return mps, nextMarker, nil
 }
 
+func (m *Mgr) loadVBuckets() error {
+	vbs, err := m.ListVBuckets()
+	if err != nil {
+		return err
+	}
+	m.VBuckets = make(map[string]*VBucket, len(vbs))
+	for _, v := range vbs {
+		m.VBuckets[v.Name] = v
+	}
+	return nil
+}
+
+func (m *Mgr) getVBucket(vbucket string) *VBucket {
+	vb, exists := m.VBuckets[vbucket]
+	if exists {
+		return vb
+	}
+	vb, _ = m.queryVBucket(vbucket)
+	if vb != nil {
+		m.VBuckets[vb.Name] = vb
+	}
+	return vb
+}
+
 // VBucketExists xxx
 func (m *Mgr) VBucketExists(vbucketName string) (bool, error) {
 	vb, err := m.queryVBucket(vbucketName)
@@ -339,7 +339,7 @@ func (m *Mgr) CreateVBucket(vbucket, location, poolID, mdsID string) error {
 		return err
 	}
 	// query and add vbucket to cache
-	//_ = m.getVBucket(vbucket)
+	_ = m.getVBucket(vbucket)
 	return nil
 }
 
@@ -405,7 +405,7 @@ func (m *Mgr) DeleteMultipart(bucket, uploadID string) error {
 	return m.deleteMultipart(bucket, uploadID)
 }
 
-// AllocMdsByVBucket xxx
-func (m *Mgr) AllocMdsByVBucket(vbucket string) string {
-	return m.MdsMgr.AllocMdsByVBucket(vbucket)
+// AllocateMds xxx
+func (m *Mgr) AllocateMds(vbucket string) string {
+	return m.MdsMgr.AllocateMds(vbucket)
 }

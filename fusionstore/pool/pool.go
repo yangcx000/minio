@@ -149,9 +149,9 @@ func (m *Mgr) GetPool(pID string) *Pool {
 	return m.pools[pID]
 }
 
-// AllocPoolByVBucket xxx
-func (m *Mgr) AllocPoolByVBucket(vbucket string) string {
-	// FIXME(yangchunxin): xxxx
+// AllocatePool xxx
+func (m *Mgr) AllocatePool(vbucket string) string {
+	// FIXME(yangchunxin): select one pool by vbucket
 	return ""
 }
 

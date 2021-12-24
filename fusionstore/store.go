@@ -68,8 +68,7 @@ func (s *Store) GetMetrics(ctx context.Context) (*minio.BackendMetrics, error) {
 	return s.Metrics, nil
 }
 
-// Shutdown saves any gateway metadata to disk
-// if necessary and reload upon next restart.
+// Shutdown saves any gateway metadata to disk if necessary and reload upon next restart.
 func (s *Store) Shutdown(ctx context.Context) error {
 	s.Cluster.Shutdown()
 	return nil
@@ -84,17 +83,21 @@ func (s *Store) StorageInfo(ctx context.Context) (si minio.StorageInfo, _ []erro
 
 // MakeBucketWithLocation creates a new bucket on S3 backend.
 func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string, opts minio.BucketOptions) error {
-	if opts.LockEnabled || opts.VersioningEnabled {
-		return minio.NotImplemented{}
-	}
-	if s3utils.CheckValidBucketName(bucket) != nil {
-		return minio.BucketNameInvalid{Bucket: bucket}
-	}
-	err := s.Cluster.CreateVBucket(bucket, opts.Location)
-	if err != nil {
-		return minio.ErrorRespToObjectError(err, bucket)
-	}
-	return nil
+	/*
+		if opts.LockEnabled || opts.VersioningEnabled {
+			return minio.NotImplemented{}
+		}
+		if s3utils.CheckValidBucketName(bucket) != nil {
+			return minio.BucketNameInvalid{Bucket: bucket}
+		}
+		err := s.Cluster.CreateVBucket(bucket, opts.Location)
+		if err != nil {
+			return minio.ErrorRespToObjectError(err, bucket)
+		}
+		return nil
+	*/
+	// Create manually the administrator through mgs cli
+	return minio.NotImplemented{}
 }
 
 // GetBucketInfo gets bucket metadata.
@@ -119,13 +122,16 @@ func (s *Store) ListBuckets(ctx context.Context) ([]minio.BucketInfo, error) {
 }
 
 // DeleteBucket deletes one bucket.
-func (s *Store) DeleteBucket(ctx context.Context, bucket string,
-	opts minio.DeleteBucketOptions) error {
-	err := s.Cluster.DeleteVBucket(bucket)
-	if err != nil {
-		return minio.ErrorRespToObjectError(err, bucket)
-	}
-	return nil
+func (s *Store) DeleteBucket(ctx context.Context, bucket string, opts minio.DeleteBucketOptions) error {
+	/*
+		err := s.Cluster.DeleteVBucket(bucket)
+		if err != nil {
+			return minio.ErrorRespToObjectError(err, bucket)
+		}
+		return nil
+	*/
+	// Delete manually the administrator through mgs cli
+	return minio.NotImplemented{}
 }
 
 // ListObjects lists all blobs in S3 bucket filtered by prefix

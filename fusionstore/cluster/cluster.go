@@ -56,9 +56,7 @@ func (c *Cluster) Shutdown() {
 }
 
 func (c *Cluster) initClients(transport http.RoundTripper) (err error) {
-	var (
-		client sdk.Client
-	)
+	var client sdk.Client
 	c.Pools = make(map[string]map[string]sdk.Client)
 	for k, v := range c.PoolMgr.GetPoolMap() {
 		_, exists := c.Pools[v.Vendor]
@@ -105,10 +103,10 @@ func (c *Cluster) CreateVBucket(vbucket, location string) error {
 	if exists {
 		return fmt.Errorf("bucket %q already exists", vbucket)
 	}
-	pID := c.PoolMgr.AllocPoolByVBucket(vbucket)
-	mID := c.VBucketMgr.AllocMdsByVBucket(vbucket)
+	pID := c.PoolMgr.AllocatePool(vbucket)
+	mID := c.VBucketMgr.AllocateMds(vbucket)
 	if len(pID) == 0 || len(mID) == 0 {
-		return fmt.Errorf("couldn't alloc pool or mds")
+		return fmt.Errorf("couldn't allocate pool or mds")
 	}
 	err = c.VBucketMgr.CreateVBucket(vbucket, location, pID, mID)
 	if err != nil {
