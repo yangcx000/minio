@@ -355,6 +355,7 @@ func (m *Mgr) DeleteVBucket(vbucket string) error {
 
 // QueryVBucket xxx
 func (m *Mgr) QueryVBucket(vbucket string) (*VBucket, error) {
+	// bypass cache, query db directly
 	return m.queryVBucket(vbucket)
 }
 

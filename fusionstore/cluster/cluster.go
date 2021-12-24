@@ -94,8 +94,8 @@ func (c *Cluster) GetClient(p *pool.Pool) sdk.Client {
 	return client
 }
 
-// CreateVBucket xxx
-func (c *Cluster) CreateVBucket(vbucket, location string) error {
+// MakeBucketWithLocation xxx
+func (c *Cluster) MakeBucketWithLocation(vbucket, location string) error {
 	exists, err := c.VBucketMgr.VBucketExists(vbucket)
 	if err != nil {
 		return err
@@ -115,8 +115,8 @@ func (c *Cluster) CreateVBucket(vbucket, location string) error {
 	return nil
 }
 
-// GetVBucketInfo xxx
-func (c *Cluster) GetVBucketInfo(vbucket string) (*minio.BucketInfo, error) {
+// GetBucketInfo xxx
+func (c *Cluster) GetBucketInfo(vbucket string) (*minio.BucketInfo, error) {
 	vb, err := c.VBucketMgr.QueryVBucket(vbucket)
 	if err != nil {
 		return nil, err
@@ -131,8 +131,8 @@ func (c *Cluster) GetVBucketInfo(vbucket string) (*minio.BucketInfo, error) {
 	return bi, nil
 }
 
-// ListVBuckets xxx
-func (c *Cluster) ListVBuckets() ([]minio.BucketInfo, error) {
+// ListBuckets xxx
+func (c *Cluster) ListBuckets() ([]minio.BucketInfo, error) {
 	vbs, err := c.VBucketMgr.ListVBuckets()
 	if err != nil {
 		return nil, err
@@ -147,8 +147,8 @@ func (c *Cluster) ListVBuckets() ([]minio.BucketInfo, error) {
 	return bis, err
 }
 
-// DeleteVBucket xxx
-func (c *Cluster) DeleteVBucket(vbucket string) error {
+// DeleteBucket xxx
+func (c *Cluster) DeleteBucket(vbucket string) error {
 	return c.VBucketMgr.DeleteVBucket(vbucket)
 }
 

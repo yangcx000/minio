@@ -90,7 +90,7 @@ func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string, opts 
 		if s3utils.CheckValidBucketName(bucket) != nil {
 			return minio.BucketNameInvalid{Bucket: bucket}
 		}
-		err := s.Cluster.CreateVBucket(bucket, opts.Location)
+		err := s.Cluster.MakeBucketWithLocation(bucket, opts.Location)
 		if err != nil {
 			return minio.ErrorRespToObjectError(err, bucket)
 		}
@@ -102,7 +102,7 @@ func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string, opts 
 
 // GetBucketInfo gets bucket metadata.
 func (s *Store) GetBucketInfo(ctx context.Context, bucket string) (bi minio.BucketInfo, e error) {
-	bucketInfo, err := s.Cluster.GetVBucketInfo(bucket)
+	bucketInfo, err := s.Cluster.GetBucketInfo(bucket)
 	if err != nil {
 		return bi, minio.ErrorRespToObjectError(err)
 	}
@@ -114,7 +114,7 @@ func (s *Store) GetBucketInfo(ctx context.Context, bucket string) (bi minio.Buck
 
 // ListBuckets lists all buckets.
 func (s *Store) ListBuckets(ctx context.Context) ([]minio.BucketInfo, error) {
-	bis, err := s.Cluster.ListVBuckets()
+	bis, err := s.Cluster.ListBuckets()
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err)
 	}
@@ -124,7 +124,7 @@ func (s *Store) ListBuckets(ctx context.Context) ([]minio.BucketInfo, error) {
 // DeleteBucket deletes one bucket.
 func (s *Store) DeleteBucket(ctx context.Context, bucket string, opts minio.DeleteBucketOptions) error {
 	/*
-		err := s.Cluster.DeleteVBucket(bucket)
+		err := s.Cluster.DeleteBucket(bucket)
 		if err != nil {
 			return minio.ErrorRespToObjectError(err, bucket)
 		}
