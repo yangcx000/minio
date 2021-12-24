@@ -8,6 +8,7 @@ package vbucket
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/minio/minio/fusionstore/mds"
@@ -64,6 +65,7 @@ type Mgr struct {
 	MdsMgr *mds.Mgr
 	// name --> vbucket
 	VBuckets map[string]*VBucket
+	sync.RWMutex
 }
 
 // NewMgr xxx
@@ -143,7 +145,10 @@ func (m *Mgr) listVBuckets() ([]*VBucket, error) {
 
 /* object apis */
 func (m *Mgr) putObject(obj *object.Object) error {
-	vb := m.getVBucket(obj.VBucket)
+	vb := m.GetVBucket(obj.VBucket)
+	if vb == nil {
+		return fmt.Errorf("vbucket %q not found", obj.VBucket)
+	}
 	srv := m.MdsMgr.GetService(vb.Mds)
 	resp, err := srv.PutObject(obj)
 	if err != nil {
@@ -156,7 +161,10 @@ func (m *Mgr) putObject(obj *object.Object) error {
 }
 
 func (m *Mgr) getObject(vbucket, objectName string) (*object.Object, error) {
-	vb := m.getVBucket(vbucket)
+	vb := m.GetVBucket(vbucket)
+	if vb == nil {
+		return nil, fmt.Errorf("vbucket %q not found", vbucket)
+	}
 	srv := m.MdsMgr.GetService(vb.Mds)
 	resp, err := srv.QueryObject(vbucket, objectName)
 	if err != nil {
@@ -174,7 +182,10 @@ func (m *Mgr) getObject(vbucket, objectName string) (*object.Object, error) {
 }
 
 func (m *Mgr) deleteObject(vbucket, object string) error {
-	vb := m.getVBucket(vbucket)
+	vb := m.GetVBucket(vbucket)
+	if vb == nil {
+		return fmt.Errorf("vbucket %q not found", vbucket)
+	}
 	srv := m.MdsMgr.GetService(vb.Mds)
 	resp, err := srv.DeleteObject(vbucket, object)
 	if err != nil {
@@ -187,9 +198,9 @@ func (m *Mgr) deleteObject(vbucket, object string) error {
 }
 
 func (m *Mgr) listObjects(lop *object.ListObjectsParam) (*object.ListObjectsResult, error) {
-	vb := m.getVBucket(lop.VBucket)
+	vb := m.GetVBucket(lop.VBucket)
 	if vb == nil {
-		return nil, errors.New("couldn't get vbucket")
+		return nil, fmt.Errorf("vbucket %q not found", lop.VBucket)
 	}
 	srv := m.MdsMgr.GetService(vb.Mds)
 	if srv == nil {
@@ -223,7 +234,10 @@ func (m *Mgr) listObjects(lop *object.ListObjectsParam) (*object.ListObjectsResu
 // begin multipart apis
 func (m *Mgr) createMultipart(mp *multipart.Multipart) (string, error) {
 	// FIXME(yangchunxin): multi clients upload the same object by multipart ??
-	vb := m.getVBucket(mp.VBucket)
+	vb := m.GetVBucket(mp.VBucket)
+	if vb == nil {
+		return "", fmt.Errorf("vbucket %q not found", mp.VBucket)
+	}
 	srv := m.MdsMgr.GetService(vb.Mds)
 	resp, err := srv.CreateMultipart(mp)
 	if err != nil {
@@ -236,7 +250,10 @@ func (m *Mgr) createMultipart(mp *multipart.Multipart) (string, error) {
 }
 
 func (m *Mgr) getMultipart(vbucket, uploadID string) (*multipart.Multipart, error) {
-	vb := m.getVBucket(vbucket)
+	vb := m.GetVBucket(vbucket)
+	if vb == nil {
+		return nil, fmt.Errorf("vbucket %q not found", vbucket)
+	}
 	srv := m.MdsMgr.GetService(vb.Mds)
 	resp, err := srv.QueryMultipart(vbucket, uploadID)
 	if err != nil {
@@ -254,7 +271,10 @@ func (m *Mgr) getMultipart(vbucket, uploadID string) (*multipart.Multipart, erro
 }
 
 func (m *Mgr) deleteMultipart(vbucket, uploadID string) error {
-	vb := m.getVBucket(vbucket)
+	vb := m.GetVBucket(vbucket)
+	if vb == nil {
+		return fmt.Errorf("vbucket %q not found", vbucket)
+	}
 	srv := m.MdsMgr.GetService(vb.Mds)
 	resp, err := srv.DeleteMultipart(vbucket, uploadID)
 	if err != nil {
@@ -268,9 +288,9 @@ func (m *Mgr) deleteMultipart(vbucket, uploadID string) error {
 
 func (m *Mgr) listMultiparts(vbucket, marker string, numMultiparts int) ([]*multipart.Multipart, string, error) {
 	nextMarker := ""
-	vb := m.getVBucket(vbucket)
+	vb := m.GetVBucket(vbucket)
 	if vb == nil {
-		return nil, nextMarker, errors.New("couldn't get vbucket")
+		return nil, nextMarker, fmt.Errorf("vbucket %q not found", vbucket)
 	}
 	srv := m.MdsMgr.GetService(vb.Mds)
 	if srv == nil {
@@ -301,6 +321,7 @@ func (m *Mgr) loadVBuckets() error {
 	if err != nil {
 		return err
 	}
+	// called once
 	m.VBuckets = make(map[string]*VBucket, len(vbs))
 	for _, v := range vbs {
 		m.VBuckets[v.Name] = v
@@ -308,16 +329,26 @@ func (m *Mgr) loadVBuckets() error {
 	return nil
 }
 
+func (m *Mgr) addVBucket(vb *VBucket) {
+	m.Lock()
+	defer m.Unlock()
+	m.VBuckets[vb.Name] = vb
+}
+
 func (m *Mgr) getVBucket(vbucket string) *VBucket {
+	m.RLock()
+	defer m.RUnlock()
 	vb, exists := m.VBuckets[vbucket]
-	if exists {
-		return vb
-	}
-	vb, _ = m.queryVBucket(vbucket)
-	if vb != nil {
-		m.VBuckets[vb.Name] = vb
+	if !exists {
+		return nil
 	}
 	return vb
+}
+
+func (m *Mgr) removeVBucket(vbucket string) {
+	m.Lock()
+	defer m.Unlock()
+	delete(m.VBuckets, vbucket)
 }
 
 // VBucketExists xxx
@@ -326,10 +357,10 @@ func (m *Mgr) VBucketExists(vbucketName string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if vb != nil {
-		return true, nil
+	if vb == nil {
+		return false, nil
 	}
-	return false, nil
+	return true, nil
 }
 
 // CreateVBucket xxx
@@ -338,9 +369,21 @@ func (m *Mgr) CreateVBucket(vbucket, location, poolID, mdsID string) error {
 	if err != nil {
 		return err
 	}
-	// query and add vbucket to cache
-	_ = m.getVBucket(vbucket)
 	return nil
+}
+
+// GetVBucket xxx
+func (m *Mgr) GetVBucket(vbucket string) *VBucket {
+	vb := m.getVBucket(vbucket)
+	if vb != nil {
+		return vb
+	}
+	vb, _ = m.queryVBucket(vbucket)
+	if vb == nil {
+		return nil
+	}
+	m.addVBucket(vb)
+	return vb
 }
 
 // DeleteVBucket xxx
@@ -349,7 +392,7 @@ func (m *Mgr) DeleteVBucket(vbucket string) error {
 	if err != nil {
 		return err
 	}
-	//delete(m.VBuckets, vbucket)
+	m.removeVBucket(vbucket)
 	return nil
 }
 

@@ -164,7 +164,7 @@ func (c *Cluster) ListObjects(bucket, prefix, marker, delimiter string,
 	}
 	lor, err := c.VBucketMgr.ListObjects(lop)
 	if err != nil {
-		return minio.ListObjectsInfo{}, err
+		return loi, err
 	}
 	objInfos := make([]minio.ObjectInfo, len(lor.Objects))
 	for i, obj := range lor.Objects {

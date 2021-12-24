@@ -17,6 +17,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/tags"
 	minio "github.com/minio/minio/cmd"
 	"github.com/minio/minio/fusionstore/cluster"
+	"github.com/minio/minio/fusionstore/utils"
 	"github.com/minio/pkg/bucket/policy"
 )
 
@@ -136,16 +137,16 @@ func (s *Store) DeleteBucket(ctx context.Context, bucket string, opts minio.Dele
 
 // ListObjects lists all blobs in S3 bucket filtered by prefix
 func (s *Store) ListObjects(ctx context.Context, bucket string, prefix string, marker string,
-	delimiter string, maxKeys int) (loi minio.ListObjectsInfo, e error) {
+	delimiter string, maxKeys int) (loi minio.ListObjectsInfo, err error) {
 	// Validate bucket name.
-	if err := s3utils.CheckValidBucketName(bucket); err != nil {
-		return minio.ListObjectsInfo{}, err
+	if err = s3utils.CheckValidBucketName(bucket); err != nil {
+		return loi, err
 	}
 	// Validate object prefix.
-	if err := s3utils.CheckValidObjectNamePrefix(prefix); err != nil {
-		return minio.ListObjectsInfo{}, err
+	if err = s3utils.CheckValidObjectNamePrefix(prefix); err != nil {
+		return loi, err
 	}
-	loi, err := s.Cluster.ListObjects(bucket, prefix, marker, delimiter, maxKeys)
+	loi, err = s.Cluster.ListObjects(bucket, prefix, marker, delimiter, maxKeys)
 	if err != nil {
 		return loi, minio.ErrorRespToObjectError(err, bucket)
 	}
@@ -156,12 +157,12 @@ func (s *Store) ListObjects(ctx context.Context, bucket string, prefix string, m
 func (s *Store) ListObjectsV2(ctx context.Context, bucket, prefix, continuationToken, delimiter string,
 	maxKeys int, fetchOwner bool, startAfter string) (loi minio.ListObjectsV2Info, e error) {
 	// FIXME(yangchunxin): why use v2?
-	return minio.ListObjectsV2Info{}, minio.NotImplemented{}
+	return loi, minio.NotImplemented{}
 }
 
-// GetObjectNInfo - returns object info and locked object ReadCloser
-func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *minio.HTTPRangeSpec, h http.Header, lockType minio.LockType,
-	opts minio.ObjectOptions) (gr *minio.GetObjectReader, err error) {
+// GetObjectNInfo returns object info and locked object ReadCloser
+func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *minio.HTTPRangeSpec,
+	h http.Header, lockType minio.LockType, opts minio.ObjectOptions) (gr *minio.GetObjectReader, err error) {
 	oi, err := s.GetObjectInfo(ctx, bucket, object, opts)
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err, bucket, object)
@@ -206,6 +207,9 @@ func (s *Store) GetObjectInfo(ctx context.Context, bucket string, object string,
 // PutObject creates a new object with the incoming data,
 func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *minio.PutObjReader,
 	opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
+	// TODO(yangchunxin): remove it
+	utils.PrettyPrint(opts)
+	//
 	pool, err := s.Cluster.GetPool(bucket)
 	if err != nil {
 		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
@@ -213,13 +217,13 @@ func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *
 	if pool == nil {
 		return objInfo, minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
 	}
-	pBucket := s.Cluster.AllocPhysicalBucket(pool.ID)
-	if len(pBucket) == 0 {
-		return objInfo, minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
-	}
 	client := s.Cluster.GetClient(pool)
 	if client == nil {
 		return objInfo, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
+	}
+	pBucket := s.Cluster.AllocPhysicalBucket(pool.ID)
+	if len(pBucket) == 0 {
+		return objInfo, minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
 	}
 	pObject := getPhysicalObject(bucket, object)
 	oi, err := client.PutObject(ctx, pBucket, pObject, bucket, object, r, opts)
@@ -236,35 +240,7 @@ func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *
 // CopyObject copies an object from source bucket to a destination bucket.
 func (s *Store) CopyObject(ctx context.Context, srcBucket string, srcObject string, dstBucket string, dstObject string,
 	srcInfo minio.ObjectInfo, srcOpts, dstOpts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	/*
-		if srcOpts.CheckPrecondFn != nil && srcOpts.CheckPrecondFn(srcInfo) {
-			return minio.ObjectInfo{}, minio.PreConditionFailed{}
-		}
-		// Set this header such that following CopyObject() always sets the right metadata on the destination.
-		// metadata input is already a trickled down value from interpreting x-amz-metadata-directive at
-		// handler layer. So what we have right now is supposed to be applied on the destination object anyways.
-		// So preserve it by adding "REPLACE" directive to save all the metadata set by CopyObject API.
-		srcInfo.UserDefined["x-amz-metadata-directive"] = "REPLACE"
-		srcInfo.UserDefined["x-amz-copy-source-if-match"] = srcInfo.ETag
-		header := make(http.Header)
-		if srcOpts.ServerSideEncryption != nil {
-			encrypt.SSECopy(srcOpts.ServerSideEncryption).Marshal(header)
-		}
-
-		if dstOpts.ServerSideEncryption != nil {
-			dstOpts.ServerSideEncryption.Marshal(header)
-		}
-
-		for k, v := range header {
-			srcInfo.UserDefined[k] = v[0]
-		}
-
-		if _, err = l.Clients["test"].CopyObject(ctx, srcBucket, srcObject, dstBucket, dstObject, srcInfo.UserDefined, miniogo.CopySrcOptions{}, miniogo.PutObjectOptions{}); err != nil {
-			return objInfo, minio.ErrorRespToObjectError(err, srcBucket, srcObject)
-		}
-		return l.GetObjectInfo(ctx, dstBucket, dstObject, dstOpts)
-	*/
-	return minio.ObjectInfo{}, minio.NotImplemented{}
+	return objInfo, minio.NotImplemented{}
 }
 
 // DeleteObject deletes a blob in bucket
