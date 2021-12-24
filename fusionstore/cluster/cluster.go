@@ -266,10 +266,7 @@ func (c *Cluster) DeleteObjectMeta(vbucket, object string) error {
 
 // GetPool xxx
 func (c *Cluster) GetPool(vbucket string) (*pool.Pool, error) {
-	vb, err := c.VBucketMgr.QueryVBucket(vbucket)
-	if err != nil {
-		return nil, err
-	}
+	vb := c.VBucketMgr.GetVBucket(vbucket)
 	if vb == nil {
 		return nil, fmt.Errorf("bucket %q not found", vbucket)
 	}

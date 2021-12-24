@@ -7,6 +7,7 @@ package pool
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/minio/minio/fusionstore/mgs"
 	"github.com/minio/minio/protos"
@@ -19,6 +20,8 @@ const (
 	VendorAws     = "s3"
 	VendorCeph    = "rgw"
 )
+
+var bucketIndex uint64
 
 // Bucket xxx
 type Bucket struct {
@@ -59,9 +62,9 @@ type Pool struct {
 	Endpoint string      `json:"endpoint"`
 	Creds    Credentials `json:"creds"`
 	// id --> bucket
-	Buckets     map[string]*Bucket `json:"buckets,omitempty"`
-	CreatedTime string             `json:"createdtime,omitempty"`
-	UpdatedTime string             `json:"updatedtime,omitempty"`
+	Buckets     []*Bucket `json:"buckets,omitempty"`
+	CreatedTime string    `json:"createdtime,omitempty"`
+	UpdatedTime string    `json:"updatedtime,omitempty"`
 }
 
 // DecodeFromPb xxx
@@ -89,18 +92,19 @@ func (p *Pool) init() error {
 	if resp.GetStatus().Code != protos.Code_OK {
 		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
-	p.Buckets = make(map[string]*Bucket, len(resp.GetBucketList()))
-	for _, v := range resp.GetBucketList() {
+	p.Buckets = make([]*Bucket, len(resp.GetBucketList()))
+	for i, v := range resp.GetBucketList() {
 		b := &Bucket{}
 		b.DecodeFromPb(v)
-		p.Buckets[b.ID] = b
+		p.Buckets[i] = b
 	}
 	return nil
 }
 
 func (p *Pool) allocBucket() string {
-	// FIXME(yangchunxin): xxx
-	return ""
+	counter := atomic.AddUint64(&bucketIndex, 1)
+	index := counter % uint64(len(p.Buckets))
+	return p.Buckets[index].Name
 }
 
 // Mgr xxx
@@ -159,6 +163,9 @@ func (m *Mgr) AllocatePool(vbucket string) string {
 func (m *Mgr) AllocBucket(pID string) string {
 	p, exists := m.pools[pID]
 	if !exists {
+		return ""
+	}
+	if len(p.Buckets) == 0 {
 		return ""
 	}
 	return p.allocBucket()
