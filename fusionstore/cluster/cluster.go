@@ -6,6 +6,7 @@
 package cluster
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -92,6 +93,39 @@ func (c *Cluster) GetClient(p *pool.Pool) sdk.Client {
 		return nil
 	}
 	return client
+}
+
+// GetObjectOperationEntrys xxx
+func (c *Cluster) GetObjectOperationEntrys(vbucket, object string) (sdk.Client, *ObjectInfoExtra, error) {
+	oie, err := c.GetObjectMetaExtra(vbucket, object)
+	if err != nil {
+		return nil, nil, err
+	}
+	pool := c.PoolMgr.GetPool(oie.Pool)
+	if pool == nil {
+		return nil, nil, errors.New("pool not found")
+	}
+	client := c.GetClient(pool)
+	return client, oie, nil
+}
+
+// GetPutObjectEntrys xxxx
+func (c *Cluster) GetPutObjectEntrys(vbucket string) (sdk.Client, string, error) {
+	vb := c.VBucketMgr.GetVBucket(vbucket)
+	if vb == nil {
+		return nil, "", errors.New("pool not found")
+	}
+	pool := c.PoolMgr.GetPool(vb.Pool)
+	if pool == nil {
+		return nil, "", errors.New("pool not found")
+	}
+	client := c.GetClient(pool)
+	return client, pool.ID, nil
+}
+
+// GetPhysicalObjectName xxx
+func (c *Cluster) GetPhysicalObjectName(vbucket, object string) string {
+	return fmt.Sprintf("%s/%s", vbucket, object)
 }
 
 // MakeBucketWithLocation xxx
@@ -236,6 +270,9 @@ func (c *Cluster) GetObjectMeta(vbucket, object string) (minio.ObjectInfo, error
 	if err != nil {
 		return minio.ObjectInfo{}, err
 	}
+	if obj == nil {
+		return minio.ObjectInfo{}, fmt.Errorf("%s/%s not found", vbucket, object)
+	}
 	objInfo := minio.ObjectInfo{
 		Name:            obj.Name,
 		Bucket:          obj.VBucket,
@@ -259,27 +296,52 @@ func (c *Cluster) GetObjectMeta(vbucket, object string) (minio.ObjectInfo, error
 	return objInfo, nil
 }
 
+// ObjectInfoExtra xxx
+type ObjectInfoExtra struct {
+	ObjectInfo minio.ObjectInfo
+	Pool       string
+	PBucket    string
+}
+
+// GetObjectMetaExtra xxx
+func (c *Cluster) GetObjectMetaExtra(vbucket, object string) (*ObjectInfoExtra, error) {
+	obj, err := c.VBucketMgr.GetObjectMeta(vbucket, object)
+	if err != nil {
+		return nil, err
+	}
+	if obj == nil {
+		return nil, fmt.Errorf("%s/%s not found", vbucket, object)
+	}
+	oie := ObjectInfoExtra{
+		ObjectInfo: minio.ObjectInfo{
+			Name:            obj.Name,
+			Bucket:          obj.VBucket,
+			ETag:            obj.Etag,
+			InnerETag:       obj.InnerEtag,
+			VersionID:       obj.VersionID,
+			ContentType:     obj.ContentType,
+			ContentEncoding: obj.ContentEncoding,
+			StorageClass:    obj.StorageClass,
+			UserTags:        obj.UserTags,
+			Size:            obj.Size,
+			IsDir:           obj.IsDir,
+			IsLatest:        obj.IsLatest,
+			DeleteMarker:    obj.DeleteMarker,
+			RestoreOngoing:  obj.RestoreOngoing,
+			ModTime:         obj.ModTime,
+			AccTime:         obj.AccTime,
+			Expires:         obj.Expires,
+			RestoreExpires:  obj.RestoreExpires,
+		},
+		Pool:    obj.Pool,
+		PBucket: obj.Bucket,
+	}
+	return &oie, nil
+}
+
 // DeleteObjectMeta xxx
 func (c *Cluster) DeleteObjectMeta(vbucket, object string) error {
 	return c.VBucketMgr.DeleteObjectMeta(vbucket, object)
-}
-
-// GetPool xxx
-func (c *Cluster) GetPool(vbucket string) (*pool.Pool, error) {
-	vb := c.VBucketMgr.GetVBucket(vbucket)
-	if vb == nil {
-		return nil, fmt.Errorf("bucket %q not found", vbucket)
-	}
-	return c.PoolMgr.GetPool(vb.Pool), nil
-}
-
-// GetObjectPoolAndBucket xxx
-func (c *Cluster) GetObjectPoolAndBucket(vbucket, object string) (*pool.Pool, string, error) {
-	obj, err := c.VBucketMgr.GetObjectMeta(vbucket, object)
-	if err != nil {
-		return nil, "", err
-	}
-	return c.PoolMgr.GetPool(obj.Pool), obj.Bucket, nil
 }
 
 // AllocPhysicalBucket xxx
@@ -288,8 +350,8 @@ func (c *Cluster) AllocPhysicalBucket(pID string) string {
 }
 
 // CreateMultipart xxx
-func (c *Cluster) CreateMultipart(pBucket, pObject, bucket, object, physicalUploadID string) (string, error) {
-	return c.VBucketMgr.CreateMultipart(pBucket, pObject, bucket, object, physicalUploadID)
+func (c *Cluster) CreateMultipart(pID, pBucket, pObject, bucket, object, physicalUploadID string) (string, error) {
+	return c.VBucketMgr.CreateMultipart(pID, pBucket, pObject, bucket, object, physicalUploadID)
 }
 
 // QueryMultipart xxx
@@ -316,12 +378,9 @@ func (c *Cluster) GetMultipartCommon(bucket, uploadID string) (*MultipartCommon,
 	if err != nil {
 		return nil, fmt.Errorf("multipart %q not found", uploadID)
 	}
-	pool, err := c.GetPool(bucket)
-	if err != nil {
-		return nil, err
-	}
+	pool := c.PoolMgr.GetPool(mc.Multipart.Pool)
 	if pool == nil {
-		return nil, fmt.Errorf("pool of bucket %q not found", bucket)
+		return nil, fmt.Errorf("pool %q not found", mc.Multipart.Pool)
 	}
 	mc.Client = c.GetClient(pool)
 	if mc.Client == nil {

@@ -17,13 +17,8 @@ import (
 	"github.com/minio/minio-go/v7/pkg/tags"
 	minio "github.com/minio/minio/cmd"
 	"github.com/minio/minio/fusionstore/cluster"
-	"github.com/minio/minio/fusionstore/utils"
 	"github.com/minio/pkg/bucket/policy"
 )
-
-func getPhysicalObject(vbucket, object string) string {
-	return fmt.Sprintf("%s/%s", vbucket, object)
-}
 
 // Store implements gateway apis.
 type Store struct {
@@ -97,7 +92,7 @@ func (s *Store) MakeBucketWithLocation(ctx context.Context, bucket string, opts 
 		}
 		return nil
 	*/
-	// Create manually the administrator through mgs cli
+	// Create manually by the administrator
 	return minio.NotImplemented{}
 }
 
@@ -163,33 +158,25 @@ func (s *Store) ListObjectsV2(ctx context.Context, bucket, prefix, continuationT
 // GetObjectNInfo returns object info and locked object ReadCloser
 func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *minio.HTTPRangeSpec,
 	h http.Header, lockType minio.LockType, opts minio.ObjectOptions) (gr *minio.GetObjectReader, err error) {
-	oi, err := s.GetObjectInfo(ctx, bucket, object, opts)
+	client, oie, err := s.Cluster.GetObjectOperationEntrys(bucket, object)
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	pool, pBucket, err := s.Cluster.GetObjectPoolAndBucket(bucket, object)
-	if err != nil {
-		return nil, minio.ErrorRespToObjectError(err, bucket, object)
+	if client == nil || oie == nil {
+		return nil, minio.ErrorRespToObjectError(errors.New("pool or pbucket not found"), bucket, object)
 	}
-	if pool == nil || len(pBucket) == 0 {
-		return nil, minio.ErrorRespToObjectError(errors.New("object/pool not found"), bucket, object)
-	}
-	client := s.Cluster.GetClient(pool)
-	if client == nil {
-		return nil, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
-	}
-	pObject := getPhysicalObject(bucket, object)
-	fn, off, length, err := minio.NewGetObjectReader(rs, oi, opts)
+	pObject := s.Cluster.GetPhysicalObjectName(bucket, object)
+	fn, off, length, err := minio.NewGetObjectReader(rs, oie.ObjectInfo, opts)
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err, bucket, object)
 	}
 	pr, pw := io.Pipe()
 	go func() {
-		err := client.GetObject(ctx, pBucket, pObject, bucket, object, off, length, pw, oi.ETag, opts)
+		err := client.GetObject(ctx, oie.PBucket, pObject, bucket, object, off, length,
+			pw, oie.ObjectInfo.ETag, opts)
 		pw.CloseWithError(err)
 	}()
-	// Setup cleanup function to cause the above go-routine to
-	// exit in case of partial read
+	// Setup cleanup function to cause the above go-routine to exit in case of partial read
 	pipeCloser := func() { pr.Close() }
 	return fn(pr, h, pipeCloser)
 }
@@ -197,44 +184,37 @@ func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *m
 // GetObjectInfo reads object info and replies back ObjectInfo
 func (s *Store) GetObjectInfo(ctx context.Context, bucket string, object string,
 	opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	oi, err := s.Cluster.GetObjectMeta(bucket, object)
+	objInfo, err = s.Cluster.GetObjectMeta(bucket, object)
 	if err != nil {
-		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
+		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	return oi, nil
+	return objInfo, nil
 }
 
 // PutObject creates a new object with the incoming data,
 func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *minio.PutObjReader,
 	opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	// TODO(yangchunxin): remove it
-	utils.PrettyPrint(opts)
-	//
-	pool, err := s.Cluster.GetPool(bucket)
+	client, pID, err := s.Cluster.GetPutObjectEntrys(bucket)
 	if err != nil {
 		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	if pool == nil {
-		return objInfo, minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	if client == nil || len(pID) == 0 {
+		return objInfo, minio.ErrorRespToObjectError(errors.New("client or pool empty"), bucket, object)
 	}
-	client := s.Cluster.GetClient(pool)
-	if client == nil {
-		return objInfo, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
-	}
-	pBucket := s.Cluster.AllocPhysicalBucket(pool.ID)
+	pBucket := s.Cluster.AllocPhysicalBucket(pID)
 	if len(pBucket) == 0 {
 		return objInfo, minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
 	}
-	pObject := getPhysicalObject(bucket, object)
-	oi, err := client.PutObject(ctx, pBucket, pObject, bucket, object, r, opts)
+	pObject := s.Cluster.GetPhysicalObjectName(bucket, object)
+	objInfo, err = client.PutObject(ctx, pBucket, pObject, bucket, object, r, opts)
 	if err != nil {
-		return oi, minio.ErrorRespToObjectError(err, bucket, object)
+		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	err = s.Cluster.PutObjectMeta(pool.ID, pBucket, oi)
+	err = s.Cluster.PutObjectMeta(pID, pBucket, objInfo)
 	if err != nil {
-		return oi, minio.ErrorRespToObjectError(err, bucket, object)
+		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	return oi, nil
+	return objInfo, nil
 }
 
 // CopyObject copies an object from source bucket to a destination bucket.
@@ -245,20 +225,16 @@ func (s *Store) CopyObject(ctx context.Context, srcBucket string, srcObject stri
 
 // DeleteObject deletes a blob in bucket
 func (s *Store) DeleteObject(ctx context.Context, bucket string, object string,
-	opts minio.ObjectOptions) (minio.ObjectInfo, error) {
-	pool, pBucket, err := s.Cluster.GetObjectPoolAndBucket(bucket, object)
+	opts minio.ObjectOptions) (oi minio.ObjectInfo, err error) {
+	client, oie, err := s.Cluster.GetObjectOperationEntrys(bucket, object)
 	if err != nil {
-		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
+		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	if pool == nil || len(pBucket) == 0 {
-		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(errors.New("bucket/pool not found"), bucket, object)
+	if client == nil || oie == nil {
+		return oi, minio.ErrorRespToObjectError(errors.New("pool or pBucket not found"), bucket, object)
 	}
-	client := s.Cluster.GetClient(pool)
-	if client == nil {
-		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
-	}
-	pObject := getPhysicalObject(bucket, object)
-	oi, err := client.DeleteObject(ctx, pBucket, pObject, bucket, object, opts)
+	pObject := s.Cluster.GetPhysicalObjectName(bucket, object)
+	oi, err = client.DeleteObject(ctx, oie.PBucket, pObject, bucket, object, opts)
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
@@ -270,7 +246,8 @@ func (s *Store) DeleteObject(ctx context.Context, bucket string, object string,
 }
 
 // DeleteObjects xxx
-func (s *Store) DeleteObjects(ctx context.Context, bucket string, objects []minio.ObjectToDelete, opts minio.ObjectOptions) ([]minio.DeletedObject, []error) {
+func (s *Store) DeleteObjects(ctx context.Context, bucket string, objects []minio.ObjectToDelete,
+	opts minio.ObjectOptions) ([]minio.DeletedObject, []error) {
 	errs := make([]error, len(objects))
 	dobjects := make([]minio.DeletedObject, len(objects))
 	for idx, object := range objects {
@@ -285,7 +262,8 @@ func (s *Store) DeleteObjects(ctx context.Context, bucket string, objects []mini
 }
 
 // ListMultipartUploads lists all multipart uploads.
-func (s *Store) ListMultipartUploads(ctx context.Context, bucket string, prefix string, keyMarker string, uploadIDMarker string, delimiter string, maxUploads int) (lmi minio.ListMultipartsInfo, e error) {
+func (s *Store) ListMultipartUploads(ctx context.Context, bucket string, prefix string, keyMarker string,
+	uploadIDMarker string, delimiter string, maxUploads int) (lmi minio.ListMultipartsInfo, e error) {
 	/*
 		poolID := l.GetPool(bucket)
 		result, err := l.Clients[poolID].ListMultipartUploads(ctx, bucket, prefix, keyMarker, uploadIDMarker, delimiter, maxUploads)
@@ -301,29 +279,25 @@ func (s *Store) ListMultipartUploads(ctx context.Context, bucket string, prefix 
 
 // NewMultipartUpload upload object in multiple parts
 func (s *Store) NewMultipartUpload(ctx context.Context, bucket string, object string, o minio.ObjectOptions) (uploadID string, err error) {
-	pool, err := s.Cluster.GetPool(bucket)
+	client, pID, err := s.Cluster.GetPutObjectEntrys(bucket)
 	if err != nil {
-		return "", minio.ErrorRespToObjectError(err, bucket, object)
+		return uploadID, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	if pool == nil {
-		return "", minio.ErrorRespToObjectError(errors.New("pool not found"), bucket, object)
+	if client == nil || len(pID) == 0 {
+		return uploadID, minio.ErrorRespToObjectError(errors.New("client or pool empty"), bucket, object)
 	}
-	pBucket := s.Cluster.AllocPhysicalBucket(pool.ID)
+	pBucket := s.Cluster.AllocPhysicalBucket(pID)
 	if len(pBucket) == 0 {
-		return "", minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
+		return uploadID, minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
 	}
-	client := s.Cluster.GetClient(pool)
-	if client == nil {
-		return "", minio.ErrorRespToObjectError(errors.New("client of pool not found"), bucket, object)
-	}
-	pObject := getPhysicalObject(bucket, object)
-	PhysicUploadID, err := client.NewMultipartUpload(ctx, pBucket, pObject, bucket, object, o)
+	pObject := s.Cluster.GetPhysicalObjectName(bucket, object)
+	physicUploadID, err := client.NewMultipartUpload(ctx, pBucket, pObject, bucket, object, o)
 	if err != nil {
-		return "", minio.ErrorRespToObjectError(err, bucket, object)
+		return uploadID, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	uploadID, err = s.Cluster.CreateMultipart(pBucket, pObject, bucket, object, PhysicUploadID)
+	uploadID, err = s.Cluster.CreateMultipart(pID, pBucket, pObject, bucket, object, physicUploadID)
 	if err != nil {
-		return "", minio.ErrorRespToObjectError(err, bucket, object)
+		return uploadID, minio.ErrorRespToObjectError(err, bucket, object)
 	}
 	return uploadID, nil
 }
@@ -335,7 +309,7 @@ func (s *Store) PutObjectPart(ctx context.Context, bucket string, object string,
 	if err != nil {
 		return pi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	pObject := getPhysicalObject(bucket, object)
+	pObject := s.Cluster.GetPhysicalObjectName(bucket, object)
 	pi, err = mc.Client.PutObjectPart(ctx, mc.Multipart.PhysicalBucket, pObject, bucket,
 		object, mc.Multipart.PhysicalUploadID, partID, r, opts)
 	if err != nil {
@@ -348,35 +322,7 @@ func (s *Store) PutObjectPart(ctx context.Context, bucket string, object string,
 // existing object or a part of it.
 func (s *Store) CopyObjectPart(ctx context.Context, srcBucket, srcObject, destBucket, destObject, uploadID string,
 	partID int, startOffset, length int64, srcInfo minio.ObjectInfo, srcOpts, dstOpts minio.ObjectOptions) (p minio.PartInfo, err error) {
-	/*
-		if srcOpts.CheckPrecondFn != nil && srcOpts.CheckPrecondFn(srcInfo) {
-			return minio.PartInfo{}, minio.PreConditionFailed{}
-		}
-		srcInfo.UserDefined = map[string]string{
-			"x-amz-copy-source-if-match": srcInfo.ETag,
-		}
-		header := make(http.Header)
-		if srcOpts.ServerSideEncryption != nil {
-			encrypt.SSECopy(srcOpts.ServerSideEncryption).Marshal(header)
-		}
-
-		if dstOpts.ServerSideEncryption != nil {
-			dstOpts.ServerSideEncryption.Marshal(header)
-		}
-		for k, v := range header {
-			srcInfo.UserDefined[k] = v[0]
-		}
-
-		completePart, err := l.Clients["test"].CopyObjectPart(ctx, srcBucket, srcObject, destBucket, destObject,
-			uploadID, partID, startOffset, length, srcInfo.UserDefined)
-		if err != nil {
-			return p, minio.ErrorRespToObjectError(err, srcBucket, srcObject)
-		}
-		p.PartNumber = completePart.PartNumber
-		p.ETag = completePart.ETag
-		return p, nil
-	*/
-	fmt.Printf("---------------CopyObjectPart-------------\n")
+	// FIXME(yangchunxinl): not implemented
 	return minio.PartInfo{}, nil
 }
 
@@ -396,7 +342,7 @@ func (s *Store) ListObjectParts(ctx context.Context, bucket string, object strin
 	if err != nil {
 		return lpi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	pObject := getPhysicalObject(bucket, object)
+	pObject := s.Cluster.GetPhysicalObjectName(bucket, object)
 	lpi, err = mc.Client.ListObjectParts(ctx, mc.Multipart.PhysicalBucket, pObject, bucket,
 		object, mc.Multipart.PhysicalUploadID, partNumberMarker, maxParts, opts)
 	if err != nil {
@@ -411,7 +357,7 @@ func (s *Store) AbortMultipartUpload(ctx context.Context, bucket string, object 
 	if err != nil {
 		return minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	pObject := getPhysicalObject(bucket, object)
+	pObject := s.Cluster.GetPhysicalObjectName(bucket, object)
 	err = mc.Client.AbortMultipartUpload(ctx, mc.Multipart.PhysicalBucket, pObject, bucket, object, mc.Multipart.PhysicalUploadID, opts)
 	if err != nil {
 		return minio.ErrorRespToObjectError(err, bucket, object)
@@ -427,122 +373,47 @@ func (s *Store) CompleteMultipartUpload(ctx context.Context, bucket string, obje
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	pObject := getPhysicalObject(bucket, object)
+	pObject := s.Cluster.GetPhysicalObjectName(bucket, object)
 	oi, err = mc.Client.CompleteMultipartUpload(ctx, mc.Multipart.PhysicalBucket, pObject, bucket,
 		object, mc.Multipart.PhysicalUploadID, uploadedParts, opts)
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	_ = s.Cluster.DeleteMultipart(bucket, uploadID)
-	//err = s.Cluster.PutObjectMeta(pl.ID, mc.Multipart.PhysicalBucket, oi)
+	err = s.Cluster.PutObjectMeta(mc.Multipart.Pool, mc.Multipart.PhysicalBucket, oi)
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
+	_ = s.Cluster.DeleteMultipart(bucket, uploadID)
 	return oi, nil
 }
 
 // SetBucketPolicy sets policy on bucket
 func (s *Store) SetBucketPolicy(ctx context.Context, bucket string, bucketPolicy *policy.Policy) error {
-	/*
-		data, err := json.Marshal(bucketPolicy)
-		if err != nil {
-			// This should not happen.
-			logger.LogIf(ctx, err)
-			return minio.ErrorRespToObjectError(err, bucket)
-		}
-
-		poolID := l.GetPool(bucket)
-		if err := l.Clients[poolID].SetBucketPolicy(ctx, bucket, string(data)); err != nil {
-			return minio.ErrorRespToObjectError(err, bucket)
-		}
-
-		return nil
-	*/
-	return nil
+	return minio.NotImplemented{}
 }
 
 // GetBucketPolicy will get policy on bucket
 func (s *Store) GetBucketPolicy(ctx context.Context, bucket string) (*policy.Policy, error) {
-	/*
-		poolID := l.GetPool(bucket)
-		data, err := l.Clients[poolID].GetBucketPolicy(ctx, bucket)
-		if err != nil {
-			return nil, minio.ErrorRespToObjectError(err, bucket)
-		}
-
-		bucketPolicy, err := policy.ParseConfig(strings.NewReader(data), bucket)
-		return bucketPolicy, minio.ErrorRespToObjectError(err, bucket)
-	*/
-	return nil, nil
+	return nil, minio.NotImplemented{}
 }
 
 // DeleteBucketPolicy deletes all policies on bucket
 func (s *Store) DeleteBucketPolicy(ctx context.Context, bucket string) error {
-	/*
-		poolID := l.GetPool(bucket)
-		if err := l.Clients[poolID].SetBucketPolicy(ctx, bucket, ""); err != nil {
-			return minio.ErrorRespToObjectError(err, bucket, "")
-		}
-		return nil
-	*/
-	return nil
+	return minio.NotImplemented{}
 }
 
 // GetObjectTags gets the tags set on the object
 func (s *Store) GetObjectTags(ctx context.Context, bucket string, object string, opts minio.ObjectOptions) (*tags.Tags, error) {
-	/*
-		var err error
-		if _, err = l.GetObjectInfo(ctx, bucket, object, opts); err != nil {
-			return nil, minio.ErrorRespToObjectError(err, bucket, object)
-		}
-
-		poolID := l.GetPool(bucket)
-		t, err := l.Clients[poolID].GetObjectTagging(ctx, bucket, object, miniogo.GetObjectTaggingOptions{})
-		if err != nil {
-			return nil, minio.ErrorRespToObjectError(err, bucket, object)
-		}
-
-		return t, nil
-	*/
 	return nil, nil
 }
 
 // PutObjectTags attaches the tags to the object
 func (s *Store) PutObjectTags(ctx context.Context, bucket, object string, tagStr string, opts minio.ObjectOptions) (minio.ObjectInfo, error) {
-	/*
-		tagObj, err := tags.Parse(tagStr, true)
-		if err != nil {
-			return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
-		}
-		poolID := l.GetPool(bucket)
-		if err = l.Clients[poolID].PutObjectTagging(ctx, bucket, object, tagObj, miniogo.PutObjectTaggingOptions{VersionID: opts.VersionID}); err != nil {
-			return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
-		}
-
-		objInfo, err := l.GetObjectInfo(ctx, bucket, object, opts)
-		if err != nil {
-			return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
-		}
-
-		return objInfo, nil
-	*/
 	return minio.ObjectInfo{}, nil
 }
 
 // DeleteObjectTags removes the tags attached to the object
 func (s *Store) DeleteObjectTags(ctx context.Context, bucket, object string, opts minio.ObjectOptions) (minio.ObjectInfo, error) {
-	/*
-		poolID := l.GetPool(bucket)
-		if err := l.Clients[poolID].RemoveObjectTagging(ctx, bucket, object, miniogo.RemoveObjectTaggingOptions{}); err != nil {
-			return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
-		}
-		objInfo, err := l.GetObjectInfo(ctx, bucket, object, opts)
-		if err != nil {
-			return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
-		}
-
-		return objInfo, nil
-	*/
 	return minio.ObjectInfo{}, nil
 }
 
@@ -553,10 +424,10 @@ func (s *Store) IsCompressionSupported() bool {
 
 // IsEncryptionSupported returns whether server side encryption is implemented for this layer.
 func (s *Store) IsEncryptionSupported() bool {
-	return minio.GlobalKMS != nil || minio.GlobalGatewaySSE.IsSet()
+	return false
 }
 
 // IsTaggingSupported xxx
 func (s *Store) IsTaggingSupported() bool {
-	return true
+	return false
 }

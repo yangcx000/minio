@@ -102,6 +102,7 @@ func (p *Pool) init() error {
 }
 
 func (p *Pool) allocBucket() string {
+	// rr algorithm
 	counter := atomic.AddUint64(&bucketIndex, 1)
 	index := counter % uint64(len(p.Buckets))
 	return p.Buckets[index].Name
@@ -155,7 +156,7 @@ func (m *Mgr) GetPool(pID string) *Pool {
 
 // AllocatePool xxx
 func (m *Mgr) AllocatePool(vbucket string) string {
-	// FIXME(yangchunxin): select one pool by vbucket
+	// XXX(yangchunxin): disabled here, manully allocate
 	return ""
 }
 

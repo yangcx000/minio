@@ -428,9 +428,10 @@ func (m *Mgr) ListObjects(lop *object.ListObjectsParam) (*object.ListObjectsResu
 }
 
 // CreateMultipart xxx
-func (m *Mgr) CreateMultipart(pBucket, pObject, bucket, object, physicalUploadID string) (string, error) {
+func (m *Mgr) CreateMultipart(pID, pBucket, pObject, bucket, object, physicalUploadID string) (string, error) {
 	mp := &multipart.Multipart{
 		PhysicalUploadID: physicalUploadID,
+		Pool:             pID,
 		VBucket:          bucket,
 		PhysicalBucket:   pBucket,
 		Object:           object,

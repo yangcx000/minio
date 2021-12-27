@@ -99,8 +99,9 @@ message Object {
 message Multipart {
     string upload_id = 1;
     string physical_upload_id = 2;
-    string vbucket = 3;
-    string physical_bucket = 4;
-    string object = 5;
-    google.protobuf.Timestamp created_time = 6;
+    string pool = 3;
+    string vbucket = 4;
+    string physical_bucket = 5;
+    string object = 6;
+    google.protobuf.Timestamp created_time = 7;
 }
