@@ -47,7 +47,8 @@ func NewBosClient(endpoint, accessKey, secretKey string) (*Bos, error) {
 }
 
 // PutObject xxx
-func (b *Bos) PutObject(ctx context.Context, pBucket string, pObject string, bucket string, object string, r *minio.PutObjReader, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
+func (b *Bos) PutObject(ctx context.Context, pBucket string, pObject string, bucket string, object string,
+	r *minio.PutObjReader, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
 	data := r.Reader
 	args := &api.PutObjectArgs{
 		UserMeta:      opts.UserDefined,
@@ -69,7 +70,8 @@ func (b *Bos) PutObject(ctx context.Context, pBucket string, pObject string, buc
 }
 
 // GetObject xxx
-func (b *Bos) GetObject(ctx context.Context, pBucket string, pObject string, bucket string, object string, startOffset int64, length int64, writer io.Writer, etag string, o minio.ObjectOptions) error {
+func (b *Bos) GetObject(ctx context.Context, pBucket string, pObject string, bucket string, object string,
+	startOffset int64, length int64, writer io.Writer, etag string, o minio.ObjectOptions) error {
 	if length < 0 && length != -1 {
 		return minio.ErrorRespToObjectError(minio.InvalidRange{}, bucket, object)
 	}
@@ -99,7 +101,8 @@ func (b *Bos) GetObject(ctx context.Context, pBucket string, pObject string, buc
 }
 
 // DeleteObject xxx
-func (b *Bos) DeleteObject(ctx context.Context, pBucket string, pObject string, bucket string, object string, opts minio.ObjectOptions) (minio.ObjectInfo, error) {
+func (b *Bos) DeleteObject(ctx context.Context, pBucket string, pObject string, bucket string,
+	object string, opts minio.ObjectOptions) (minio.ObjectInfo, error) {
 	err := b.client.DeleteObject(pBucket, pObject)
 	if err != nil {
 		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
@@ -112,7 +115,8 @@ func (b *Bos) DeleteObject(ctx context.Context, pBucket string, pObject string, 
 }
 
 // NewMultipartUpload xxx
-func (b *Bos) NewMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, o minio.ObjectOptions) (uploadID string, err error) {
+func (b *Bos) NewMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string,
+	object string, o minio.ObjectOptions) (uploadID string, err error) {
 	result, err := b.client.InitiateMultipartUpload(pBucket, pObject, "", nil)
 	if err != nil {
 		return uploadID, minio.ErrorRespToObjectError(err, bucket, object)
@@ -121,7 +125,8 @@ func (b *Bos) NewMultipartUpload(ctx context.Context, pBucket string, pObject st
 }
 
 // PutObjectPart xxx
-func (b *Bos) PutObjectPart(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, partID int, r *minio.PutObjReader, opts minio.ObjectOptions) (pi minio.PartInfo, e error) {
+func (b *Bos) PutObjectPart(ctx context.Context, pBucket string, pObject string, bucket string, object string,
+	uploadID string, partID int, r *minio.PutObjReader, opts minio.ObjectOptions) (pi minio.PartInfo, e error) {
 	data := r.Reader
 	args := &api.UploadPartArgs{
 		ContentMD5:    data.MD5Base64String(),
@@ -173,7 +178,8 @@ func resultToPartsInfo(lpr *api.ListPartsResult) minio.ListPartsInfo {
 }
 
 // ListObjectParts xxx
-func (b *Bos) ListObjectParts(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, partNumberMarker int, maxParts int, opts minio.ObjectOptions) (lpi minio.ListPartsInfo, e error) {
+func (b *Bos) ListObjectParts(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string,
+	partNumberMarker int, maxParts int, opts minio.ObjectOptions) (lpi minio.ListPartsInfo, e error) {
 	args := &api.ListPartsArgs{
 		MaxParts:         maxParts,
 		PartNumberMarker: strconv.Itoa(partNumberMarker),
@@ -203,7 +209,8 @@ func (b *Bos) ListObjectParts(ctx context.Context, pBucket string, pObject strin
 }
 
 // AbortMultipartUpload xxx
-func (b *Bos) AbortMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, opts minio.ObjectOptions) error {
+func (b *Bos) AbortMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string,
+	object string, uploadID string, opts minio.ObjectOptions) error {
 	err := b.client.AbortMultipartUpload(pBucket, pObject, uploadID)
 	return minio.ErrorRespToObjectError(err, bucket, object)
 }
@@ -222,7 +229,8 @@ func toCompleteMultipartUploadArgs(parts []minio.CompletePart) *api.CompleteMult
 }
 
 // CompleteMultipartUpload xxx
-func (b *Bos) CompleteMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, uploadedParts []minio.CompletePart, opts minio.ObjectOptions) (oi minio.ObjectInfo, e error) {
+func (b *Bos) CompleteMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string,
+	uploadID string, uploadedParts []minio.CompletePart, opts minio.ObjectOptions) (oi minio.ObjectInfo, e error) {
 	args := toCompleteMultipartUploadArgs(uploadedParts)
 	result, err := b.client.CompleteMultipartUploadFromStruct(pBucket, pObject, uploadID, args)
 	if err != nil {

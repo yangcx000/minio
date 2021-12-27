@@ -8,7 +8,6 @@ package fusionstore
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -273,7 +272,6 @@ func (s *Store) ListMultipartUploads(ctx context.Context, bucket string, prefix 
 
 		return minio.FromMinioClientListMultipartsInfo(result), nil
 	*/
-	fmt.Printf("----------------------ListMultipartUploads NotImplemented---------------------------\n")
 	return minio.ListMultipartsInfo{}, minio.NotImplemented{}
 }
 
@@ -323,7 +321,7 @@ func (s *Store) PutObjectPart(ctx context.Context, bucket string, object string,
 func (s *Store) CopyObjectPart(ctx context.Context, srcBucket, srcObject, destBucket, destObject, uploadID string,
 	partID int, startOffset, length int64, srcInfo minio.ObjectInfo, srcOpts, dstOpts minio.ObjectOptions) (p minio.PartInfo, err error) {
 	// FIXME(yangchunxinl): not implemented
-	return minio.PartInfo{}, nil
+	return minio.PartInfo{}, minio.NotImplemented{}
 }
 
 // GetMultipartInfo returns multipart info of the uploadId of the object

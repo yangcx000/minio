@@ -87,7 +87,8 @@ func newCore(endpoint string, creds madmin.Credentials, transport http.RoundTrip
 }
 
 // PutObject xxx
-func (s *S3) PutObject(ctx context.Context, pBucket string, pObject string, bucket string, object string, r *minio.PutObjReader, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
+func (s *S3) PutObject(ctx context.Context, pBucket string, pObject string, bucket string, object string,
+	r *minio.PutObjReader, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
 	data := r.Reader
 	var tagMap map[string]string
 	if tagstr, ok := opts.UserDefined[xhttp.AmzObjectTagging]; ok && tagstr != "" {
@@ -123,7 +124,8 @@ func (s *S3) PutObject(ctx context.Context, pBucket string, pObject string, buck
 }
 
 // GetObject xxx
-func (s *S3) GetObject(ctx context.Context, pBucket string, pObject string, bucket string, object string, startOffset int64, length int64, writer io.Writer, etag string, o minio.ObjectOptions) error {
+func (s *S3) GetObject(ctx context.Context, pBucket string, pObject string, bucket string, object string,
+	startOffset int64, length int64, writer io.Writer, etag string, o minio.ObjectOptions) error {
 	if length < 0 && length != -1 {
 		return minio.ErrorRespToObjectError(minio.InvalidRange{}, bucket, object)
 	}
@@ -149,7 +151,8 @@ func (s *S3) GetObject(ctx context.Context, pBucket string, pObject string, buck
 }
 
 // DeleteObject xxx
-func (s *S3) DeleteObject(ctx context.Context, pBucket string, pObject string, bucket string, object string, opts minio.ObjectOptions) (minio.ObjectInfo, error) {
+func (s *S3) DeleteObject(ctx context.Context, pBucket string, pObject string, bucket string,
+	object string, opts minio.ObjectOptions) (minio.ObjectInfo, error) {
 	err := s.client.RemoveObject(ctx, pBucket, pObject, miniogo.RemoveObjectOptions{})
 	if err != nil {
 		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
@@ -162,7 +165,8 @@ func (s *S3) DeleteObject(ctx context.Context, pBucket string, pObject string, b
 }
 
 // NewMultipartUpload xxx
-func (s *S3) NewMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, o minio.ObjectOptions) (uploadID string, err error) {
+func (s *S3) NewMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string,
+	object string, o minio.ObjectOptions) (uploadID string, err error) {
 	var tagMap map[string]string
 	if tagStr, ok := o.UserDefined[xhttp.AmzObjectTagging]; ok {
 		tagObj, err := tags.Parse(tagStr, true)
@@ -186,9 +190,11 @@ func (s *S3) NewMultipartUpload(ctx context.Context, pBucket string, pObject str
 }
 
 // PutObjectPart xxx
-func (s *S3) PutObjectPart(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, partID int, r *minio.PutObjReader, opts minio.ObjectOptions) (pi minio.PartInfo, e error) {
+func (s *S3) PutObjectPart(ctx context.Context, pBucket string, pObject string, bucket string, object string,
+	uploadID string, partID int, r *minio.PutObjReader, opts minio.ObjectOptions) (pi minio.PartInfo, e error) {
 	data := r.Reader
-	info, err := s.client.PutObjectPart(ctx, pBucket, pObject, uploadID, partID, data, data.Size(), data.MD5Base64String(), data.SHA256HexString(), opts.ServerSideEncryption)
+	info, err := s.client.PutObjectPart(ctx, pBucket, pObject, uploadID, partID, data, data.Size(),
+		data.MD5Base64String(), data.SHA256HexString(), opts.ServerSideEncryption)
 	if err != nil {
 		return pi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
@@ -196,7 +202,8 @@ func (s *S3) PutObjectPart(ctx context.Context, pBucket string, pObject string, 
 }
 
 // ListObjectParts xxx
-func (s *S3) ListObjectParts(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, partNumberMarker int, maxParts int, opts minio.ObjectOptions) (lpi minio.ListPartsInfo, e error) {
+func (s *S3) ListObjectParts(ctx context.Context, pBucket string, pObject string, bucket string, object string,
+	uploadID string, partNumberMarker int, maxParts int, opts minio.ObjectOptions) (lpi minio.ListPartsInfo, e error) {
 	result, err := s.client.ListObjectParts(ctx, pBucket, pObject, uploadID, partNumberMarker, maxParts)
 	if err != nil {
 		return lpi, err
@@ -209,11 +216,8 @@ func (s *S3) ListObjectParts(ctx context.Context, pBucket string, pObject string
 			if err != nil {
 				return lpi, err
 			}
-
 			nlpi := minio.FromMinioClientListPartsInfo(result)
-
 			partNumberMarker = nlpi.NextPartNumberMarker
-
 			lpi.Parts = append(lpi.Parts, nlpi.Parts...)
 			if !nlpi.IsTruncated {
 				break
@@ -224,14 +228,17 @@ func (s *S3) ListObjectParts(ctx context.Context, pBucket string, pObject string
 }
 
 // AbortMultipartUpload xxx
-func (s *S3) AbortMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, opts minio.ObjectOptions) error {
+func (s *S3) AbortMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string,
+	object string, uploadID string, opts minio.ObjectOptions) error {
 	err := s.client.AbortMultipartUpload(ctx, pBucket, pObject, uploadID)
 	return minio.ErrorRespToObjectError(err, bucket, object)
 }
 
 // CompleteMultipartUpload xxx
-func (s *S3) CompleteMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, uploadedParts []minio.CompletePart, opts minio.ObjectOptions) (oi minio.ObjectInfo, e error) {
-	etag, err := s.client.CompleteMultipartUpload(ctx, pBucket, pObject, uploadID, minio.ToMinioClientCompleteParts(uploadedParts), miniogo.PutObjectOptions{})
+func (s *S3) CompleteMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string,
+	uploadID string, uploadedParts []minio.CompletePart, opts minio.ObjectOptions) (oi minio.ObjectInfo, e error) {
+	etag, err := s.client.CompleteMultipartUpload(ctx, pBucket, pObject, uploadID,
+		minio.ToMinioClientCompleteParts(uploadedParts), miniogo.PutObjectOptions{})
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
