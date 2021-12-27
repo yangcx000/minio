@@ -72,24 +72,36 @@ message VBucket {
 
 // object
 message Object {
-  string name = 1;
-  string vbucket = 2;
-  string pool = 3;
-  string bucket = 4;
-  string etag = 5;
-  string inner_etag = 6;
-  string version_id = 7;
-  string content_type = 8;
-  string content_encoding = 9;
-  string storage_class = 10; 
-  string user_tags = 11;
-  int64 size = 12;
-  bool is_dir = 13;
-  bool is_latest = 14;
-  bool delete_marker = 15; 
-  bool restore_ongoing = 16;
-  google.protobuf.Timestamp mod_time = 17;
-  google.protobuf.Timestamp acc_time = 18;
-  google.protobuf.Timestamp expires = 19;
-  google.protobuf.Timestamp restore_expires = 20;
+  string id = 1;
+  string name = 2;
+  string vbucket = 3;
+  string pool = 4;
+  string bucket = 5;
+  string etag = 6;
+  string inner_etag = 7;
+  string version_id = 8;
+  string content_type = 9;
+  string content_encoding = 10;
+  string storage_class = 11; 
+  string user_tags = 12;
+  int64 size = 13;
+  bool is_dir = 14;
+  bool is_latest = 15;
+  bool delete_marker = 16; 
+  bool restore_ongoing = 17;
+  google.protobuf.Timestamp mod_time = 18;
+  google.protobuf.Timestamp acc_time = 19;
+  google.protobuf.Timestamp expires = 20;
+  google.protobuf.Timestamp restore_expires = 21;
+}
+
+// multipart
+message Multipart {
+    string upload_id = 1;
+    string physical_upload_id = 2;
+    string pool = 3;
+    string vbucket = 4;
+    string physical_bucket = 5;
+    string object = 6;
+    google.protobuf.Timestamp created_time = 7;
 }

@@ -8,10 +8,12 @@ package sdk
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/minio/madmin-go"
@@ -157,4 +159,92 @@ func (s *S3) DeleteObject(ctx context.Context, pBucket string, pObject string, b
 		Name:   object,
 	}
 	return objInfo, nil
+}
+
+// NewMultipartUpload xxx
+func (s *S3) NewMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, o minio.ObjectOptions) (uploadID string, err error) {
+	var tagMap map[string]string
+	if tagStr, ok := o.UserDefined[xhttp.AmzObjectTagging]; ok {
+		tagObj, err := tags.Parse(tagStr, true)
+		if err != nil {
+			return uploadID, minio.ErrorRespToObjectError(err, bucket, object)
+		}
+		tagMap = tagObj.ToMap()
+		delete(o.UserDefined, xhttp.AmzObjectTagging)
+	}
+	// Create PutObject options
+	opts := miniogo.PutObjectOptions{
+		UserMetadata:         o.UserDefined,
+		ServerSideEncryption: o.ServerSideEncryption,
+		UserTags:             tagMap,
+	}
+	uploadID, err = s.client.NewMultipartUpload(ctx, pBucket, pObject, opts)
+	if err != nil {
+		return uploadID, minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	return uploadID, nil
+}
+
+// PutObjectPart xxx
+func (s *S3) PutObjectPart(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, partID int, r *minio.PutObjReader, opts minio.ObjectOptions) (pi minio.PartInfo, e error) {
+	data := r.Reader
+	info, err := s.client.PutObjectPart(ctx, pBucket, pObject, uploadID, partID, data, data.Size(), data.MD5Base64String(), data.SHA256HexString(), opts.ServerSideEncryption)
+	if err != nil {
+		return pi, minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	return minio.FromMinioClientObjectPart(info), nil
+}
+
+// ListObjectParts xxx
+func (s *S3) ListObjectParts(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, partNumberMarker int, maxParts int, opts minio.ObjectOptions) (lpi minio.ListPartsInfo, e error) {
+	result, err := s.client.ListObjectParts(ctx, pBucket, pObject, uploadID, partNumberMarker, maxParts)
+	if err != nil {
+		return lpi, err
+	}
+	lpi = minio.FromMinioClientListPartsInfo(result)
+	if lpi.IsTruncated && maxParts > len(lpi.Parts) {
+		partNumberMarker = lpi.NextPartNumberMarker
+		for {
+			result, err = s.client.ListObjectParts(ctx, pBucket, pObject, uploadID, partNumberMarker, maxParts)
+			if err != nil {
+				return lpi, err
+			}
+
+			nlpi := minio.FromMinioClientListPartsInfo(result)
+
+			partNumberMarker = nlpi.NextPartNumberMarker
+
+			lpi.Parts = append(lpi.Parts, nlpi.Parts...)
+			if !nlpi.IsTruncated {
+				break
+			}
+		}
+	}
+	return lpi, nil
+}
+
+// AbortMultipartUpload xxx
+func (s *S3) AbortMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, opts minio.ObjectOptions) error {
+	err := s.client.AbortMultipartUpload(ctx, pBucket, pObject, uploadID)
+	return minio.ErrorRespToObjectError(err, bucket, object)
+}
+
+// CompleteMultipartUpload xxx
+func (s *S3) CompleteMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, uploadedParts []minio.CompletePart, opts minio.ObjectOptions) (oi minio.ObjectInfo, e error) {
+	etag, err := s.client.CompleteMultipartUpload(ctx, pBucket, pObject, uploadID, minio.ToMinioClientCompleteParts(uploadedParts), miniogo.PutObjectOptions{})
+	if err != nil {
+		return oi, minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	cmdObjInfo, err := s.client.StatObject(ctx, pBucket, pObject, miniogo.StatObjectOptions{})
+	if err != nil {
+		return oi, minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	oi = minio.FromMinioClientObjectInfo(bucket, cmdObjInfo)
+	// replace pobject with object
+	oi.Name = object
+	cmuEtag := strings.Trim(etag, "\"")
+	if cmuEtag != oi.ETag {
+		fmt.Printf("****************CompleteMultipartUpload Etag %s != objInfo Etag %s\n", cmuEtag, oi.ETag)
+	}
+	return oi, nil
 }

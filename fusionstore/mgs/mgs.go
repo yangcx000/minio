@@ -25,8 +25,7 @@ type Service struct {
 }
 
 // NewService xxx
-func NewService(mgsAddr string, timeout int) error {
-	var err error
+func NewService(mgsAddr string, timeout int) (err error) {
 	GlobalService = &Service{timeout: time.Duration(timeout) * time.Second}
 	opts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithBlock()}
 	if GlobalService.conn, err = grpc.Dial(mgsAddr, opts...); err != nil {

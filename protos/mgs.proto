@@ -45,13 +45,13 @@ message QueryMdsResponse {
 }
 
 message ListMdsRequest {
-    string prev = 1;
+    string marker = 1;
     int32 limits = 2;
 }
 
 message ListMdsResponse {
     Status status = 1;
-    string next = 2;
+    string nextMarker = 2;
     repeated Mds mds_list = 3;
 }
 
@@ -91,13 +91,13 @@ message QueryPoolResponse {
 }
 
 message ListPoolsRequest {
-    string prev = 1;
+    string marker = 1;
     int32 limits = 2; 
 }
 
 message ListPoolsResponse {
     Status status = 1;
-    string next = 2;
+    string nextMarker = 2;
     repeated Pool pool_list = 3;
 }
 
@@ -129,14 +129,14 @@ message QueryBucketResponse {
 }
 
 message ListBucketsRequest {
-    string prev = 1;
+    string marker = 1;
     int32 limits = 2; 
     string pool_id = 3;
 }
 
 message ListBucketsResponse {
     Status status = 1;
-    string next = 2;
+    string nextMarker = 2;
     repeated Bucket bucket_list = 3;
 }
 
@@ -167,13 +167,13 @@ message QueryVBucketResponse{
 }
 
 message ListVBucketsRequest {
-    string prev = 1;
+    string marker = 1;
     int32 limits = 2; 
 }
 
 message ListVBucketsResponse{
     Status status = 1;
-    string next = 2;
+    string nextMarker = 2;
     repeated VBucket vbuckets = 3;
 }
 

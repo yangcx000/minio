@@ -20,7 +20,7 @@ message PutObjectResponse {
 
 message DeleteObjectRequest {
     string vbucket = 1;
-    string object = 2;
+    string object_name = 2;
 }
 
 message DeleteObjectResponse {
@@ -29,7 +29,7 @@ message DeleteObjectResponse {
 
 message QueryObjectRequest {
     string vbucket = 1;
-    string object = 2;
+    string object_name = 2;
 }
 
 message QueryObjectResponse {
@@ -39,14 +39,69 @@ message QueryObjectResponse {
 
 message ListObjectsRequest {
     string vbucket = 1;
-    string prev = 2;
-    int32 limits = 3;
+    string prefix = 2;
+    string marker = 3;
+    string delimiter = 4;
+    int32 limits = 5;
 }
 
 message ListObjectsResponse {
     Status status = 1;
-    string next = 2;
+    string next_marker = 2;
     repeated Object objects = 3;
+    repeated string common_prefixs = 4;
+}
+
+message ListAllObjectsRequest {
+    string marker = 1;
+    int32 limits = 2;
+}
+
+message ListAllObjectsResponse {
+    Status status = 1;
+    string next_marker = 2;
+    repeated Object objects = 3;
+}
+
+// multipart apis
+message CreateMultipartRequest {
+    Multipart multipart = 1; 
+}
+
+message CreateMultipartResponse {
+    Status status = 1;
+    string upload_id = 2;
+}
+
+message DeleteMultipartRequest {
+    string vbucket = 1;
+    string upload_id = 2;
+}
+
+message DeleteMultipartResponse {
+    Status status = 1;
+}
+
+message QueryMultipartRequest {
+    string vbucket = 1;
+    string upload_id = 2;
+}
+
+message QueryMultipartResponse {
+    Status status = 1;
+    Multipart multipart = 2; 
+}
+
+message ListMultipartsRequest {
+    string vbucket = 1;
+    string prev = 2;
+    int32 limits = 3;
+}
+
+message ListMultipartsResponse {
+    Status status = 1;
+    string next = 2;
+    repeated Multipart multiparts = 3; 
 }
 
 service MdsService {
@@ -55,4 +110,10 @@ service MdsService {
   rpc DeleteObject(DeleteObjectRequest) returns (DeleteObjectResponse) {}
   rpc QueryObject(QueryObjectRequest) returns (QueryObjectResponse) {}
   rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse) {}
+  rpc ListAllObjects(ListAllObjectsRequest) returns (ListAllObjectsResponse) {}
+  // multipart operations 
+  rpc CreateMultipart(CreateMultipartRequest) returns (CreateMultipartResponse) {}
+  rpc DeleteMultipart(DeleteMultipartRequest) returns (DeleteMultipartResponse) {}
+  rpc QueryMultipart(QueryMultipartRequest) returns (QueryMultipartResponse) {}
+  rpc ListMultiparts(ListMultipartsRequest) returns (ListMultipartsResponse) {}
 }

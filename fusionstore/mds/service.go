@@ -9,6 +9,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/minio/minio/fusionstore/multipart"
 	"github.com/minio/minio/fusionstore/object"
 	"github.com/minio/minio/protos"
 	"google.golang.org/grpc"
@@ -47,10 +48,10 @@ func (s *Service) PutObject(obj *object.Object) (*protos.PutObjectResponse, erro
 }
 
 // DeleteObject xxx
-func (s *Service) DeleteObject(vbucket, object string) (*protos.DeleteObjectResponse, error) {
+func (s *Service) DeleteObject(vbucket, objectName string) (*protos.DeleteObjectResponse, error) {
 	req := &protos.DeleteObjectRequest{
-		Vbucket: vbucket,
-		Object:  object,
+		Vbucket:    vbucket,
+		ObjectName: objectName,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
@@ -58,10 +59,10 @@ func (s *Service) DeleteObject(vbucket, object string) (*protos.DeleteObjectResp
 }
 
 // QueryObject xxx
-func (s *Service) QueryObject(vbucket, object string) (*protos.QueryObjectResponse, error) {
+func (s *Service) QueryObject(vbucket, objectName string) (*protos.QueryObjectResponse, error) {
 	req := &protos.QueryObjectRequest{
-		Vbucket: vbucket,
-		Object:  object,
+		Vbucket:    vbucket,
+		ObjectName: objectName,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
@@ -69,9 +70,53 @@ func (s *Service) QueryObject(vbucket, object string) (*protos.QueryObjectRespon
 }
 
 // ListObjects xxx
-func (s *Service) ListObjects(vbucket, marker string, limits int32) (*protos.ListObjectsResponse, error) {
-	req := &protos.ListObjectsRequest{Vbucket: vbucket, Prev: marker, Limits: limits}
+func (s *Service) ListObjects(lop *object.ListObjectsParam) (*protos.ListObjectsResponse, error) {
+	req := &protos.ListObjectsRequest{
+		Vbucket:   lop.VBucket,
+		Prefix:    lop.Prefix,
+		Marker:    lop.Marker,
+		Delimiter: lop.Delimiter,
+		Limits:    int32(lop.Limits),
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
 	return s.svc.ListObjects(ctx, req)
+}
+
+// CreateMultipart xxx
+func (s *Service) CreateMultipart(mp *multipart.Multipart) (*protos.CreateMultipartResponse, error) {
+	req := &protos.CreateMultipartRequest{Multipart: mp.EncodeToPb()}
+	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+	defer cancel()
+	return s.svc.CreateMultipart(ctx, req)
+}
+
+// DeleteMultipart xxx
+func (s *Service) DeleteMultipart(vbucket, uploadID string) (*protos.DeleteMultipartResponse, error) {
+	req := &protos.DeleteMultipartRequest{
+		Vbucket:  vbucket,
+		UploadId: uploadID,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+	defer cancel()
+	return s.svc.DeleteMultipart(ctx, req)
+}
+
+// QueryMultipart xxx
+func (s *Service) QueryMultipart(vbucket, uploadID string) (*protos.QueryMultipartResponse, error) {
+	req := &protos.QueryMultipartRequest{
+		Vbucket:  vbucket,
+		UploadId: uploadID,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+	defer cancel()
+	return s.svc.QueryMultipart(ctx, req)
+}
+
+// ListMultiparts xxx
+func (s *Service) ListMultiparts(vbucket, marker string, limits int32) (*protos.ListMultipartsResponse, error) {
+	req := &protos.ListMultipartsRequest{Vbucket: vbucket, Prev: marker, Limits: limits}
+	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+	defer cancel()
+	return s.svc.ListMultiparts(ctx, req)
 }
