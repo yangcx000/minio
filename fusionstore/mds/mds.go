@@ -12,6 +12,14 @@ import (
 	"github.com/minio/minio/protos"
 )
 
+const (
+	timeoutValue = 10
+	// mds status
+	mdsStatusUnknown = "unknown"
+	mdsStatusActive  = "active"
+	mdsStatusStandby = "standby"
+)
+
 // Mds metadata service
 type Mds struct {
 	ID          string `json:"id"`
@@ -64,6 +72,16 @@ func (m *Mgr) Shutdown() {
 	}
 }
 
+// GetMdsMap xxx
+func (m *Mgr) GetMdsMap() map[string]*Mds {
+	return m.mdsMap
+}
+
+// GetMdsServices xxx
+func (m *Mgr) GetMdsServices() map[string]*Service {
+	return m.mdsServices
+}
+
 // GetService xxx
 func (m *Mgr) GetService(mdsID string) *Service {
 	return m.mdsServices[mdsID]
@@ -83,7 +101,11 @@ func (m *Mgr) loadMds() error {
 	for _, v := range resp.GetMdsList() {
 		md := &Mds{}
 		md.DecodeFromPb(v)
-		svc, err := NewService(md.Endpoint, 10)
+		// filter active mds
+		if md.Status != mdsStatusActive {
+			continue
+		}
+		svc, err := NewService(md.Endpoint, timeoutValue)
 		if err != nil {
 			return err
 		}

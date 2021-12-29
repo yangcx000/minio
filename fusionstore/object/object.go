@@ -19,7 +19,7 @@ type Object struct {
 	VBucket         string    `json:"vbucket"`
 	Pool            string    `json:"pool"`
 	Bucket          string    `json:"bucket"`
-	Etag            string    `json:"etag"`
+	ETag            string    `json:"etag"`
 	InnerEtag       string    `json:"inner_etag"`
 	VersionID       string    `json:"version_id"`
 	ContentType     string    `json:"content_type"`
@@ -45,7 +45,7 @@ func (o *Object) EncodeToPb() *protos.Object {
 		Vbucket:         o.VBucket,
 		Pool:            o.Pool,
 		Bucket:          o.Bucket,
-		Etag:            o.Etag,
+		Etag:            o.ETag,
 		InnerEtag:       o.InnerEtag,
 		VersionId:       o.VersionID,
 		ContentType:     o.ContentType,
@@ -72,7 +72,7 @@ func (o *Object) DecodeFromPb(p *protos.Object) {
 	o.VBucket = p.Vbucket
 	o.Pool = p.Pool
 	o.Bucket = p.Bucket
-	o.Etag = p.Etag
+	o.ETag = p.Etag
 	o.InnerEtag = p.InnerEtag
 	o.VersionID = p.VersionId
 	o.ContentType = p.ContentType

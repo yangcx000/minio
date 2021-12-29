@@ -20,21 +20,24 @@ import (
 
 const (
 	scanLimits = 1000
+	// vbucket status
+	vbucketStatusUnknown = "unknown"
+	vbucketStatusActive  = "active"
+	vbucketStatusStandby = "standby"
 )
 
 // VBucket xxx
 type VBucket struct {
-	ID          string                    `json:"id,omitempty"`
-	Name        string                    `json:"name"`
-	Status      string                    `json:"status,omitempty"`
-	Owner       string                    `json:"owner,omitempty"`
-	Pool        string                    `json:"pool,omitempty"`
-	Mds         string                    `json:"mds,omitempty"`
-	Location    string                    `json:"location,omitempty"`
-	Version     int                       `json:"version,omitempty"`
-	Objects     map[string]*object.Object `json:"objects,omitempty"`
-	CreatedTime time.Time                 `json:"created_time,omitempty"`
-	UpdatedTime time.Time                 `json:"updated_time,omitempty"`
+	ID          string    `json:"id,omitempty"`
+	Name        string    `json:"name"`
+	Status      string    `json:"status,omitempty"`
+	Owner       string    `json:"owner,omitempty"`
+	Pool        string    `json:"pool,omitempty"`
+	Mds         string    `json:"mds,omitempty"`
+	Location    string    `json:"location,omitempty"`
+	Version     int       `json:"version,omitempty"`
+	CreatedTime time.Time `json:"created_time,omitempty"`
+	UpdatedTime time.Time `json:"updated_time,omitempty"`
 }
 
 // DecodeFromPb xxx
@@ -49,15 +52,6 @@ func (v *VBucket) DecodeFromPb(p *protos.VBucket) {
 	v.Version = int(p.GetVersion())
 	v.CreatedTime = p.GetCreatedTime().AsTime()
 	v.UpdatedTime = p.GetUpdatedTime().AsTime()
-}
-
-func (v *VBucket) getObject(object string) *object.Object {
-	obj, exists := v.Objects[object]
-	if exists {
-		return obj
-	}
-	// XXX
-	return nil
 }
 
 // Mgr xxx
@@ -136,6 +130,10 @@ func (m *Mgr) listVBuckets() ([]*VBucket, error) {
 	for i, v := range resp.GetVbuckets() {
 		vb := &VBucket{}
 		vb.DecodeFromPb(v)
+		// filter active vbucket
+		if vb.Status != vbucketStatusActive {
+			continue
+		}
 		vbs[i] = vb
 	}
 	return vbs, nil
@@ -452,5 +450,6 @@ func (m *Mgr) DeleteMultipart(bucket, uploadID string) error {
 
 // AllocateMds xxx
 func (m *Mgr) AllocateMds(vbucket string) string {
+	// no use
 	return m.MdsMgr.AllocateMds(vbucket)
 }

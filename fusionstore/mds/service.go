@@ -26,7 +26,10 @@ type Service struct {
 func NewService(mdsAddr string, timeout int) (*Service, error) {
 	var err error
 	service := &Service{timeout: time.Duration(timeout) * time.Second}
-	opts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithBlock()}
+	opts := []grpc.DialOption{
+		grpc.WithInsecure(), grpc.WithBlock(),
+		grpc.WithTimeout(time.Duration(timeout) * time.Second),
+	}
 	if service.conn, err = grpc.Dial(mdsAddr, opts...); err != nil {
 		return service, err
 	}
