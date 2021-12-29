@@ -106,6 +106,9 @@ func (c *Cluster) GetObjectOperationEntrys(vbucket, object string) (sdk.Client, 
 		return nil, nil, errors.New("pool not found")
 	}
 	client := c.GetClient(pool)
+	if client == nil {
+		return nil, nil, errors.New("client of pool not found")
+	}
 	return client, oie, nil
 }
 
@@ -113,13 +116,16 @@ func (c *Cluster) GetObjectOperationEntrys(vbucket, object string) (sdk.Client, 
 func (c *Cluster) GetPutObjectEntrys(vbucket string) (sdk.Client, string, error) {
 	vb := c.VBucketMgr.GetVBucket(vbucket)
 	if vb == nil {
-		return nil, "", errors.New("pool not found")
+		return nil, "", errors.New("bucket not found")
 	}
 	pool := c.PoolMgr.GetPool(vb.Pool)
 	if pool == nil {
 		return nil, "", errors.New("pool not found")
 	}
 	client := c.GetClient(pool)
+	if client == nil {
+		return nil, "", errors.New("client of pool not found")
+	}
 	return client, pool.ID, nil
 }
 

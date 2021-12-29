@@ -6,13 +6,9 @@
 package mds
 
 import (
-	"fmt"
 	"testing"
-	"time"
 
-	"github.com/minio/minio/fusionstore/multipart"
 	"github.com/minio/minio/fusionstore/object"
-	"github.com/minio/minio/fusionstore/utils"
 )
 
 const (
@@ -29,11 +25,12 @@ func TestNewService(t *testing.T) {
 	}
 }
 
+/*
 func TestPutObject(t *testing.T) {
-	for i := 1000; i < 1100; i++ {
+	for i := 2000; i < 2010; i++ {
 		obj := &object.Object{
 			ID:          fmt.Sprintf("object-%d", i),
-			Name:        fmt.Sprintf("object-name-%d", i),
+			Name:        fmt.Sprintf("a/object-name-%d", i),
 			VBucket:     "vbucket-001",
 			Pool:        "pool-001",
 			Bucket:      "bucket-001",
@@ -63,18 +60,36 @@ func TestQueryObject(t *testing.T) {
 	}
 	utils.PrettyPrint(resp.GetObject())
 }
+*/
 
 func TestDeleteObject(t *testing.T) {
-	vbucket, objName := "vbucket-001", "object-name-001"
-	resp, err := testGlobalSvc.DeleteObject(vbucket, objName)
+	//vbucket, objName := "vbucket-001", "object-name-001"
+	lop := &object.ListObjectsParam{
+		VBucket: "vbucket-001",
+		Prefix:  "",
+		//Marker:    "a/b/c/d/object-name-18",
+		Delimiter: "",
+		Limits:    1000,
+	}
+	resp, err := testGlobalSvc.ListObjects(lop)
 	if err != nil {
-		t.Fatalf("DeleteObject failed, err:%s", err)
+		t.Fatalf("ListObjects failed, err:%s", err)
 	}
 	if resp.GetStatus().GetCode() != 0 {
-		t.Fatal("DeleteObject code failed")
+		t.Fatal("ListObjects code failed")
+	}
+	for _, obj := range resp.GetObjects() {
+		resp, err := testGlobalSvc.DeleteObject(obj.Vbucket, obj.Name)
+		if err != nil {
+			t.Fatalf("DeleteObject failed, err:%s", err)
+		}
+		if resp.GetStatus().GetCode() != 0 {
+			t.Fatal("DeleteObject code failed")
+		}
 	}
 }
 
+/*
 func TestListObjects(t *testing.T) {
 	lop := &object.ListObjectsParam{
 		VBucket: "vbucket-001",
@@ -152,6 +167,7 @@ func TestListMultiparts(t *testing.T) {
 	}
 	utils.PrettyPrint(resp.GetMultiparts())
 }
+*/
 
 func TestClose(t *testing.T) {
 	testGlobalSvc.Close()

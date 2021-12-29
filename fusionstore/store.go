@@ -161,9 +161,6 @@ func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *m
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	if client == nil || oie == nil {
-		return nil, minio.ErrorRespToObjectError(errors.New("pool or pbucket not found"), bucket, object)
-	}
 	pObject := s.Cluster.GetPhysicalObjectName(bucket, object)
 	fn, off, length, err := minio.NewGetObjectReader(rs, oie.ObjectInfo, opts)
 	if err != nil {
@@ -197,9 +194,7 @@ func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *
 	if err != nil {
 		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	if client == nil || len(pID) == 0 {
-		return objInfo, minio.ErrorRespToObjectError(errors.New("client or pool empty"), bucket, object)
-	}
+	// 从pool内分配物理bucket
 	pBucket := s.Cluster.AllocPhysicalBucket(pID)
 	if len(pBucket) == 0 {
 		return objInfo, minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)

@@ -376,6 +376,7 @@ func (m *Mgr) GetVBucket(vbucket string) *VBucket {
 	if vb != nil {
 		return vb
 	}
+	// FIXME(yangchunxin): print err log
 	vb, _ = m.queryVBucket(vbucket)
 	if vb == nil {
 		return nil
