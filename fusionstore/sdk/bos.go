@@ -50,11 +50,13 @@ func NewBosClient(endpoint, accessKey, secretKey string) (*Bos, error) {
 func (b *Bos) PutObject(ctx context.Context, pBucket string, pObject string, bucket string, object string,
 	r *minio.PutObjReader, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
 	data := r.Reader
+	// XXX: md5 empty
+	size, md5, sha256 := data.Size(), data.MD5Base64String(), data.SHA256HexString()
 	args := &api.PutObjectArgs{
 		UserMeta:      opts.UserDefined,
-		ContentMD5:    data.MD5Base64String(),
-		ContentLength: data.Size(),
-		ContentSha256: data.SHA256HexString(),
+		ContentMD5:    md5,
+		ContentLength: size,
+		ContentSha256: sha256,
 	}
 	etag, err := b.client.PutObjectFromStream(pBucket, pObject, data, args)
 	if err != nil {
@@ -63,7 +65,7 @@ func (b *Bos) PutObject(ctx context.Context, pBucket string, pObject string, buc
 	objInfo = minio.ObjectInfo{
 		Bucket: bucket,
 		Name:   object,
-		Size:   data.Size(),
+		Size:   size,
 		ETag:   etag,
 	}
 	return objInfo, nil
@@ -117,6 +119,7 @@ func (b *Bos) DeleteObject(ctx context.Context, pBucket string, pObject string, 
 // NewMultipartUpload xxx
 func (b *Bos) NewMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string,
 	object string, o minio.ObjectOptions) (uploadID string, err error) {
+	// XXX(yangchunxin): content-type empty
 	result, err := b.client.InitiateMultipartUpload(pBucket, pObject, "", nil)
 	if err != nil {
 		return uploadID, minio.ErrorRespToObjectError(err, bucket, object)
@@ -128,11 +131,12 @@ func (b *Bos) NewMultipartUpload(ctx context.Context, pBucket string, pObject st
 func (b *Bos) PutObjectPart(ctx context.Context, pBucket string, pObject string, bucket string, object string,
 	uploadID string, partID int, r *minio.PutObjReader, opts minio.ObjectOptions) (pi minio.PartInfo, e error) {
 	data := r.Reader
+	size, md5, sha256 := data.Size(), data.MD5Base64String(), data.SHA256HexString()
 	args := &api.UploadPartArgs{
-		ContentMD5:    data.MD5Base64String(),
-		ContentSha256: data.SHA256HexString(),
+		ContentMD5:    md5,
+		ContentSha256: sha256,
 	}
-	body, err := bce.NewBodyFromSizedReader(data, data.Size())
+	body, err := bce.NewBodyFromSizedReader(data, size)
 	if err != nil {
 		return pi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
@@ -144,7 +148,7 @@ func (b *Bos) PutObjectPart(ctx context.Context, pBucket string, pObject string,
 		PartNumber:   partID,
 		LastModified: time.Now(),
 		ETag:         etag,
-		Size:         data.Size(),
+		Size:         size,
 	}
 	return pi, nil
 }
@@ -152,11 +156,12 @@ func (b *Bos) PutObjectPart(ctx context.Context, pBucket string, pObject string,
 func toParts(lpts []api.ListPartType) []minio.PartInfo {
 	pis := make([]minio.PartInfo, len(lpts))
 	for i, v := range lpts {
+		lastModified, _ := time.Parse(time.RFC3339, v.LastModified)
 		pis[i] = minio.PartInfo{
-			PartNumber: v.PartNumber,
-			//LastModified: v.LastModified,
-			ETag: v.ETag,
-			Size: int64(v.Size),
+			PartNumber:   v.PartNumber,
+			LastModified: lastModified,
+			ETag:         v.ETag,
+			Size:         int64(v.Size),
 		}
 	}
 	return pis
@@ -178,22 +183,26 @@ func resultToPartsInfo(lpr *api.ListPartsResult) minio.ListPartsInfo {
 }
 
 // ListObjectParts xxx
-func (b *Bos) ListObjectParts(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string,
-	partNumberMarker int, maxParts int, opts minio.ObjectOptions) (lpi minio.ListPartsInfo, e error) {
+func (b *Bos) ListObjectParts(ctx context.Context, pUploadID string, pBucket string, pObject string, bucket string,
+	object string, uploadID string, partNumberMarker int, maxParts int, opts minio.ObjectOptions) (lpi minio.ListPartsInfo, e error) {
 	args := &api.ListPartsArgs{
 		MaxParts:         maxParts,
 		PartNumberMarker: strconv.Itoa(partNumberMarker),
 	}
-	result, err := b.client.ListParts(pBucket, pObject, uploadID, args)
+	result, err := b.client.ListParts(pBucket, pObject, pUploadID, args)
 	if err != nil {
 		return lpi, err
 	}
 	lpi = resultToPartsInfo(result)
+	// replace bucket/object/uploadID
+	lpi.UploadID = uploadID
+	lpi.Bucket = bucket
+	lpi.Object = object
 	if lpi.IsTruncated && maxParts > len(lpi.Parts) {
 		partNumberMarker = lpi.NextPartNumberMarker
 		for {
 			args.PartNumberMarker = strconv.Itoa(partNumberMarker)
-			result, err = b.client.ListParts(pBucket, pObject, uploadID, args)
+			result, err = b.client.ListParts(pBucket, pObject, pUploadID, args)
 			if err != nil {
 				return lpi, err
 			}
@@ -211,8 +220,7 @@ func (b *Bos) ListObjectParts(ctx context.Context, pBucket string, pObject strin
 // AbortMultipartUpload xxx
 func (b *Bos) AbortMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string,
 	object string, uploadID string, opts minio.ObjectOptions) error {
-	err := b.client.AbortMultipartUpload(pBucket, pObject, uploadID)
-	return minio.ErrorRespToObjectError(err, bucket, object)
+	return b.client.AbortMultipartUpload(pBucket, pObject, uploadID)
 }
 
 func toCompleteMultipartUploadArgs(parts []minio.CompletePart) *api.CompleteMultipartUploadArgs {
@@ -234,14 +242,15 @@ func (b *Bos) CompleteMultipartUpload(ctx context.Context, pBucket string, pObje
 	args := toCompleteMultipartUploadArgs(uploadedParts)
 	result, err := b.client.CompleteMultipartUploadFromStruct(pBucket, pObject, uploadID, args)
 	if err != nil {
-		return oi, minio.ErrorRespToObjectError(err, bucket, object)
+		return oi, err
 	}
 	meta, err := b.client.GetObjectMeta(pBucket, pObject)
 	if err != nil {
-		return oi, minio.ErrorRespToObjectError(err, bucket, object)
+		return oi, err
 	}
 	if result.ETag != meta.ETag {
-		return oi, minio.ErrorRespToObjectError(errors.New("etag not equal"), bucket, object)
+		fmt.Printf("multipart etag %s not equal meta etag %s\n", result.ETag, meta.ETag)
+		return oi, errors.New("etag not equal")
 	}
 	oi = minio.ObjectInfo{
 		Bucket: bucket,

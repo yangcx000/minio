@@ -8,6 +8,7 @@ package fusionstore
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -150,13 +151,39 @@ func (s *Store) ListObjects(ctx context.Context, bucket string, prefix string, m
 // ListObjectsV2 lists all blobs in S3 bucket filtered by prefix
 func (s *Store) ListObjectsV2(ctx context.Context, bucket, prefix, continuationToken, delimiter string,
 	maxKeys int, fetchOwner bool, startAfter string) (loi minio.ListObjectsV2Info, e error) {
-	// FIXME(yangchunxin): why use v2?
-	return loi, minio.NotImplemented{}
+	if len(startAfter) != 0 {
+		return loi, minio.NotImplemented{Message: fmt.Sprintf("startAfter %s not empty", startAfter)}
+	}
+	// Validate bucket name.
+	if err := s3utils.CheckValidBucketName(bucket); err != nil {
+		return loi, err
+	}
+	// Validate object prefix.
+	if err := s3utils.CheckValidObjectNamePrefix(prefix); err != nil {
+		return loi, err
+	}
+	// replace marker with continuationToken
+	loiV1, err := s.Cluster.ListObjects(bucket, prefix, continuationToken, delimiter, maxKeys)
+	if err != nil {
+		return loi, minio.ErrorRespToObjectError(err, bucket)
+	}
+	loi = minio.ListObjectsV2Info{
+		IsTruncated:           loiV1.IsTruncated,
+		ContinuationToken:     continuationToken,
+		NextContinuationToken: loiV1.NextMarker,
+		Objects:               loiV1.Objects,
+		Prefixes:              loiV1.Prefixes,
+	}
+	return loi, nil
 }
 
 // GetObjectNInfo returns object info and locked object ReadCloser
 func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *minio.HTTPRangeSpec,
 	h http.Header, lockType minio.LockType, opts minio.ObjectOptions) (gr *minio.GetObjectReader, err error) {
+	// XXX(yangchunxin): not support get object by partnumber
+	if rs == nil && opts.PartNumber > 0 {
+		return nil, minio.NotImplemented{Message: fmt.Sprintf("partNumber %d != 0", opts.PartNumber)}
+	}
 	client, oie, err := s.Cluster.GetObjectOperationEntrys(bucket, object)
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err, bucket, object)
@@ -190,6 +217,10 @@ func (s *Store) GetObjectInfo(ctx context.Context, bucket string, object string,
 // PutObject creates a new object with the incoming data,
 func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *minio.PutObjReader,
 	opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
+	// XXX(yangchunxin): not support server side encryption
+	if opts.ServerSideEncryption != nil {
+		return objInfo, minio.NotImplemented{Message: fmt.Sprintf("server side encyption not supported")}
+	}
 	client, pID, err := s.Cluster.GetPutObjectEntrys(bucket)
 	if err != nil {
 		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
@@ -223,9 +254,6 @@ func (s *Store) DeleteObject(ctx context.Context, bucket string, object string,
 	client, oie, err := s.Cluster.GetObjectOperationEntrys(bucket, object)
 	if err != nil {
 		return oi, minio.ErrorRespToObjectError(err, bucket, object)
-	}
-	if client == nil || oie == nil {
-		return oi, minio.ErrorRespToObjectError(errors.New("pool or pBucket not found"), bucket, object)
 	}
 	pObject := s.Cluster.GetPhysicalObjectName(bucket, object)
 	oi, err = client.DeleteObject(ctx, oie.PBucket, pObject, bucket, object, opts)
@@ -276,9 +304,6 @@ func (s *Store) NewMultipartUpload(ctx context.Context, bucket string, object st
 	if err != nil {
 		return uploadID, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	if client == nil || len(pID) == 0 {
-		return uploadID, minio.ErrorRespToObjectError(errors.New("client or pool empty"), bucket, object)
-	}
 	pBucket := s.Cluster.AllocPhysicalBucket(pID)
 	if len(pBucket) == 0 {
 		return uploadID, minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
@@ -292,6 +317,9 @@ func (s *Store) NewMultipartUpload(ctx context.Context, bucket string, object st
 	if err != nil {
 		return uploadID, minio.ErrorRespToObjectError(err, bucket, object)
 	}
+	fmt.Printf("NewMultipartUpload: bucket:%s, object:%s, uploadID:%s, pBucket:%s, pObject:%s, pUploadID:%s\n",
+		bucket, object, uploadID, pBucket, pObject, physicUploadID)
+
 	return uploadID, nil
 }
 
@@ -336,8 +364,8 @@ func (s *Store) ListObjectParts(ctx context.Context, bucket string, object strin
 		return lpi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
 	pObject := s.Cluster.GetPhysicalObjectName(bucket, object)
-	lpi, err = mc.Client.ListObjectParts(ctx, mc.Multipart.PhysicalBucket, pObject, bucket,
-		object, mc.Multipart.PhysicalUploadID, partNumberMarker, maxParts, opts)
+	lpi, err = mc.Client.ListObjectParts(ctx, mc.Multipart.PhysicalUploadID, mc.Multipart.PhysicalBucket,
+		pObject, bucket, object, mc.Multipart.UploadID, partNumberMarker, maxParts, opts)
 	if err != nil {
 		return lpi, err
 	}
@@ -355,7 +383,10 @@ func (s *Store) AbortMultipartUpload(ctx context.Context, bucket string, object 
 	if err != nil {
 		return minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	_ = s.Cluster.DeleteMultipart(bucket, uploadID)
+	err = s.Cluster.DeleteMultipart(bucket, uploadID)
+	if err != nil {
+		return minio.ErrorRespToObjectError(err, bucket, object)
+	}
 	return nil
 }
 

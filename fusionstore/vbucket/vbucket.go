@@ -258,9 +258,6 @@ func (m *Mgr) getMultipart(vbucket, uploadID string) (*multipart.Multipart, erro
 		return nil, err
 	}
 	if resp.GetStatus().Code != protos.Code_OK {
-		if resp.GetStatus().Code == protos.Code_NOT_FOUND {
-			return nil, nil
-		}
 		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
 	mp := &multipart.Multipart{}
