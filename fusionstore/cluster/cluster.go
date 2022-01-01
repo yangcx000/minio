@@ -101,6 +101,9 @@ func (c *Cluster) GetObjectOperationEntrys(vbucket, object string) (sdk.Client, 
 	if err != nil {
 		return nil, nil, err
 	}
+	if oie == nil {
+		return nil, nil, errors.New("object not found")
+	}
 	pool := c.PoolMgr.GetPool(oie.Pool)
 	if pool == nil {
 		return nil, nil, errors.New("pool not found")
@@ -271,15 +274,15 @@ func (c *Cluster) PutObjectMeta(pID, pBucket string, oi minio.ObjectInfo) error 
 }
 
 // GetObjectMeta xxx
-func (c *Cluster) GetObjectMeta(vbucket, object string) (minio.ObjectInfo, error) {
+func (c *Cluster) GetObjectMeta(vbucket, object string) (*minio.ObjectInfo, error) {
 	obj, err := c.VBucketMgr.GetObjectMeta(vbucket, object)
 	if err != nil {
-		return minio.ObjectInfo{}, err
+		return nil, err
 	}
 	if obj == nil {
-		return minio.ObjectInfo{}, fmt.Errorf("%s/%s not found", vbucket, object)
+		return nil, nil
 	}
-	objInfo := minio.ObjectInfo{
+	objInfo := &minio.ObjectInfo{
 		Name:            obj.Name,
 		Bucket:          obj.VBucket,
 		ETag:            obj.ETag,
@@ -316,9 +319,9 @@ func (c *Cluster) GetObjectMetaExtra(vbucket, object string) (*ObjectInfoExtra, 
 		return nil, err
 	}
 	if obj == nil {
-		return nil, fmt.Errorf("%s/%s not found", vbucket, object)
+		return nil, nil
 	}
-	oie := ObjectInfoExtra{
+	oie := &ObjectInfoExtra{
 		ObjectInfo: minio.ObjectInfo{
 			Name:            obj.Name,
 			Bucket:          obj.VBucket,
@@ -342,7 +345,7 @@ func (c *Cluster) GetObjectMetaExtra(vbucket, object string) (*ObjectInfoExtra, 
 		Pool:    obj.Pool,
 		PBucket: obj.Bucket,
 	}
-	return &oie, nil
+	return oie, nil
 }
 
 // DeleteObjectMeta xxx

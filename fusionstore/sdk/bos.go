@@ -73,22 +73,23 @@ func (b *Bos) PutObject(ctx context.Context, pBucket string, pObject string, buc
 
 // GetObject xxx
 func (b *Bos) GetObject(ctx context.Context, pBucket string, pObject string, bucket string, object string,
-	startOffset int64, length int64, writer io.Writer, etag string, o minio.ObjectOptions) error {
-	if length < 0 && length != -1 {
-		return minio.ErrorRespToObjectError(minio.InvalidRange{}, bucket, object)
-	}
+	rs *minio.HTTPRangeSpec, writer io.Writer, etag string, o minio.ObjectOptions) error {
 	var (
 		result *api.GetObjectResult
 		err    error
 	)
-	start, end := startOffset, startOffset+length-1
-	switch {
-	case 0 < start && end == 0:
-		result, err = b.client.GetObject(pBucket, pObject, nil, start)
-	case 0 <= start && start <= end:
-		result, err = b.client.GetObject(pBucket, pObject, nil, start, end)
-	default:
-		return minio.ErrorRespToObjectError(fmt.Errorf("Invalid range specified: start=%d end=%d", start, end), bucket, object)
+	if rs == nil {
+		result, err = b.client.GetObject(pBucket, pObject, nil)
+	} else {
+		if !rs.IsSuffixLength {
+			if rs.End == -1 {
+				result, err = b.client.GetObject(pBucket, pObject, nil, rs.Start)
+			} else {
+				result, err = b.client.GetObject(pBucket, pObject, nil, rs.Start, rs.End)
+			}
+		} else {
+			return minio.ErrorRespToObjectError(errors.New("not support suffix length range"), bucket, object)
+		}
 	}
 	if err != nil {
 		return err

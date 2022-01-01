@@ -126,15 +126,17 @@ func (s *S3) PutObject(ctx context.Context, pBucket string, pObject string, buck
 
 // GetObject xxx
 func (s *S3) GetObject(ctx context.Context, pBucket string, pObject string, bucket string, object string,
-	startOffset int64, length int64, writer io.Writer, etag string, o minio.ObjectOptions) error {
-	if length < 0 {
-		return minio.ErrorRespToObjectError(minio.InvalidRange{}, bucket, object)
-	}
+	rs *minio.HTTPRangeSpec, writer io.Writer, etag string, o minio.ObjectOptions) error {
 	opts := miniogo.GetObjectOptions{}
-	opts.ServerSideEncryption = o.ServerSideEncryption
-	if startOffset >= 0 && length >= 0 {
-		if err := opts.SetRange(startOffset, startOffset+length-1); err != nil {
-			return minio.ErrorRespToObjectError(err, bucket, object)
+	if rs != nil {
+		if rs.IsSuffixLength {
+			opts.Set("Range", fmt.Sprintf("bytes=%d", rs.Start))
+		} else {
+			if rs.End == -1 {
+				opts.Set("Range", fmt.Sprintf("bytes=%d-", rs.Start))
+			} else {
+				opts.Set("Range", fmt.Sprintf("bytes=%d-%d", rs.Start, rs.End))
+			}
 		}
 	}
 	if etag != "" {

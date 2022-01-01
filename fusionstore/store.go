@@ -180,6 +180,11 @@ func (s *Store) ListObjectsV2(ctx context.Context, bucket, prefix, continuationT
 // GetObjectNInfo returns object info and locked object ReadCloser
 func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *minio.HTTPRangeSpec,
 	h http.Header, lockType minio.LockType, opts minio.ObjectOptions) (gr *minio.GetObjectReader, err error) {
+	// XXX: delete me
+	if rs != nil {
+		fmt.Printf("GetObjectNInfo: bucket:%s, object:%s, rangeStart:%d, rangeEnd:%d\n",
+			bucket, object, rs.Start, rs.End)
+	}
 	// XXX(yangchunxin): not support get object by partnumber
 	if rs == nil && opts.PartNumber > 0 {
 		return nil, minio.NotImplemented{Message: fmt.Sprintf("partNumber %d != 0", opts.PartNumber)}
@@ -189,14 +194,13 @@ func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *m
 		return nil, minio.ErrorRespToObjectError(err, bucket, object)
 	}
 	pObject := s.Cluster.GetPhysicalObjectName(bucket, object)
-	fn, off, length, err := minio.NewGetObjectReader(rs, oie.ObjectInfo, opts)
+	fn, _, _, err := minio.NewGetObjectReader(rs, oie.ObjectInfo, opts)
 	if err != nil {
 		return nil, minio.ErrorRespToObjectError(err, bucket, object)
 	}
 	pr, pw := io.Pipe()
 	go func() {
-		err := client.GetObject(ctx, oie.PBucket, pObject, bucket, object, off, length,
-			pw, oie.ObjectInfo.ETag, opts)
+		err := client.GetObject(ctx, oie.PBucket, pObject, bucket, object, rs, pw, oie.ObjectInfo.ETag, opts)
 		pw.CloseWithError(err)
 	}()
 	// Setup cleanup function to cause the above go-routine to exit in case of partial read
@@ -207,11 +211,14 @@ func (s *Store) GetObjectNInfo(ctx context.Context, bucket, object string, rs *m
 // GetObjectInfo reads object info and replies back ObjectInfo
 func (s *Store) GetObjectInfo(ctx context.Context, bucket string, object string,
 	opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
-	objInfo, err = s.Cluster.GetObjectMeta(bucket, object)
+	oi, err := s.Cluster.GetObjectMeta(bucket, object)
 	if err != nil {
 		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	return objInfo, nil
+	if oi == nil {
+		return objInfo, minio.ErrorRespToObjectError(errors.New("object not found"), bucket, object)
+	}
+	return *oi, nil
 }
 
 // PutObject creates a new object with the incoming data,
@@ -225,10 +232,21 @@ func (s *Store) PutObject(ctx context.Context, bucket string, object string, r *
 	if err != nil {
 		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	// 从pool内分配物理bucket
-	pBucket := s.Cluster.AllocPhysicalBucket(pID)
-	if len(pBucket) == 0 {
-		return objInfo, minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
+	// query object exists or not
+	oie, err := s.Cluster.GetObjectMetaExtra(bucket, object)
+	if err != nil {
+		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	var pBucket string
+	if oie != nil {
+		// 复用已有pbucket
+		pBucket = oie.PBucket
+	} else {
+		// 从pool内分配物理bucket
+		pBucket = s.Cluster.AllocPhysicalBucket(pID)
+		if len(pBucket) == 0 {
+			return objInfo, minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
+		}
 	}
 	pObject := s.Cluster.GetPhysicalObjectName(bucket, object)
 	objInfo, err = client.PutObject(ctx, pBucket, pObject, bucket, object, r, opts)
@@ -304,9 +322,21 @@ func (s *Store) NewMultipartUpload(ctx context.Context, bucket string, object st
 	if err != nil {
 		return uploadID, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	pBucket := s.Cluster.AllocPhysicalBucket(pID)
-	if len(pBucket) == 0 {
-		return uploadID, minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
+	// query object exists or not
+	oie, err := s.Cluster.GetObjectMetaExtra(bucket, object)
+	if err != nil {
+		return uploadID, minio.ErrorRespToObjectError(err, bucket, object)
+	}
+	var pBucket string
+	if oie != nil {
+		// 复用已有pbucket
+		pBucket = oie.PBucket
+	} else {
+		// 从pool内分配物理bucket
+		pBucket = s.Cluster.AllocPhysicalBucket(pID)
+		if len(pBucket) == 0 {
+			return uploadID, minio.ErrorRespToObjectError(errors.New("physical bucket not found"), bucket, object)
+		}
 	}
 	pObject := s.Cluster.GetPhysicalObjectName(bucket, object)
 	physicUploadID, err := client.NewMultipartUpload(ctx, pBucket, pObject, bucket, object, o)

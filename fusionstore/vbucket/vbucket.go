@@ -211,9 +211,6 @@ func (m *Mgr) listObjects(lop *object.ListObjectsParam) (*object.ListObjectsResu
 	if err != nil {
 		return nil, err
 	}
-	if resp.GetStatus().Code != protos.Code_OK {
-		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
-	}
 	lor := &object.ListObjectsResult{
 		CommonPrefixs: resp.GetCommonPrefixs(),
 		NextMarker:    resp.GetNextMarker(),
