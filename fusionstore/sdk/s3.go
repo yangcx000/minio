@@ -87,7 +87,8 @@ func newCore(endpoint string, creds madmin.Credentials, transport http.RoundTrip
 }
 
 // PutObject xxx
-func (s *S3) PutObject(ctx context.Context, pBucket string, pObject string, bucket string, object string, r *minio.PutObjReader, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
+func (s *S3) PutObject(ctx context.Context, pBucket string, pObject string, bucket string, object string,
+	r *minio.PutObjReader, opts minio.ObjectOptions) (objInfo minio.ObjectInfo, err error) {
 	data := r.Reader
 	var tagMap map[string]string
 	if tagstr, ok := opts.UserDefined[xhttp.AmzObjectTagging]; ok && tagstr != "" {
@@ -107,11 +108,12 @@ func (s *S3) PutObject(ctx context.Context, pBucket string, pObject string, buck
 		// we can set md5sum to be calculated always.
 		SendContentMd5: true,
 	}
-	ui, err := s.client.PutObject(ctx, pBucket, pObject, data, data.Size(), data.MD5Base64String(), data.SHA256HexString(), putOpts)
+	// XXX(yangchunxin): md5 empty
+	size, md5, sha256 := data.Size(), data.MD5Base64String(), data.SHA256HexString()
+	ui, err := s.client.PutObject(ctx, pBucket, pObject, data, size, md5, sha256, putOpts)
 	if err != nil {
 		return objInfo, minio.ErrorRespToObjectError(err, bucket, object)
 	}
-	// On success, populate the key & metadata so they are present in the notification
 	oi := miniogo.ObjectInfo{
 		ETag:     ui.ETag,
 		Size:     ui.Size,
@@ -123,15 +125,18 @@ func (s *S3) PutObject(ctx context.Context, pBucket string, pObject string, buck
 }
 
 // GetObject xxx
-func (s *S3) GetObject(ctx context.Context, pBucket string, pObject string, bucket string, object string, startOffset int64, length int64, writer io.Writer, etag string, o minio.ObjectOptions) error {
-	if length < 0 && length != -1 {
-		return minio.ErrorRespToObjectError(minio.InvalidRange{}, bucket, object)
-	}
+func (s *S3) GetObject(ctx context.Context, pBucket string, pObject string, bucket string, object string,
+	rs *minio.HTTPRangeSpec, writer io.Writer, etag string, o minio.ObjectOptions) error {
 	opts := miniogo.GetObjectOptions{}
-	opts.ServerSideEncryption = o.ServerSideEncryption
-	if startOffset >= 0 && length >= 0 {
-		if err := opts.SetRange(startOffset, startOffset+length-1); err != nil {
-			return minio.ErrorRespToObjectError(err, bucket, object)
+	if rs != nil {
+		if rs.IsSuffixLength {
+			opts.Set("Range", fmt.Sprintf("bytes=%d", rs.Start))
+		} else {
+			if rs.End == -1 {
+				opts.Set("Range", fmt.Sprintf("bytes=%d-", rs.Start))
+			} else {
+				opts.Set("Range", fmt.Sprintf("bytes=%d-%d", rs.Start, rs.End))
+			}
 		}
 	}
 	if etag != "" {
@@ -149,7 +154,8 @@ func (s *S3) GetObject(ctx context.Context, pBucket string, pObject string, buck
 }
 
 // DeleteObject xxx
-func (s *S3) DeleteObject(ctx context.Context, pBucket string, pObject string, bucket string, object string, opts minio.ObjectOptions) (minio.ObjectInfo, error) {
+func (s *S3) DeleteObject(ctx context.Context, pBucket string, pObject string, bucket string,
+	object string, opts minio.ObjectOptions) (minio.ObjectInfo, error) {
 	err := s.client.RemoveObject(ctx, pBucket, pObject, miniogo.RemoveObjectOptions{})
 	if err != nil {
 		return minio.ObjectInfo{}, minio.ErrorRespToObjectError(err, bucket, object)
@@ -162,7 +168,8 @@ func (s *S3) DeleteObject(ctx context.Context, pBucket string, pObject string, b
 }
 
 // NewMultipartUpload xxx
-func (s *S3) NewMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, o minio.ObjectOptions) (uploadID string, err error) {
+func (s *S3) NewMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string,
+	object string, o minio.ObjectOptions) (uploadID string, err error) {
 	var tagMap map[string]string
 	if tagStr, ok := o.UserDefined[xhttp.AmzObjectTagging]; ok {
 		tagObj, err := tags.Parse(tagStr, true)
@@ -186,9 +193,12 @@ func (s *S3) NewMultipartUpload(ctx context.Context, pBucket string, pObject str
 }
 
 // PutObjectPart xxx
-func (s *S3) PutObjectPart(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, partID int, r *minio.PutObjReader, opts minio.ObjectOptions) (pi minio.PartInfo, e error) {
+func (s *S3) PutObjectPart(ctx context.Context, pBucket string, pObject string, bucket string, object string,
+	uploadID string, partID int, r *minio.PutObjReader, opts minio.ObjectOptions) (pi minio.PartInfo, e error) {
 	data := r.Reader
-	info, err := s.client.PutObjectPart(ctx, pBucket, pObject, uploadID, partID, data, data.Size(), data.MD5Base64String(), data.SHA256HexString(), opts.ServerSideEncryption)
+	size, md5, sha256 := data.Size(), data.MD5Base64String(), data.SHA256HexString()
+	info, err := s.client.PutObjectPart(ctx, pBucket, pObject, uploadID, partID, data, size,
+		md5, sha256, opts.ServerSideEncryption)
 	if err != nil {
 		return pi, minio.ErrorRespToObjectError(err, bucket, object)
 	}
@@ -196,24 +206,26 @@ func (s *S3) PutObjectPart(ctx context.Context, pBucket string, pObject string, 
 }
 
 // ListObjectParts xxx
-func (s *S3) ListObjectParts(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, partNumberMarker int, maxParts int, opts minio.ObjectOptions) (lpi minio.ListPartsInfo, e error) {
-	result, err := s.client.ListObjectParts(ctx, pBucket, pObject, uploadID, partNumberMarker, maxParts)
+func (s *S3) ListObjectParts(ctx context.Context, pUploadID string, pBucket string, pObject string, bucket string, object string,
+	uploadID string, partNumberMarker int, maxParts int, opts minio.ObjectOptions) (lpi minio.ListPartsInfo, e error) {
+	result, err := s.client.ListObjectParts(ctx, pBucket, pObject, pUploadID, partNumberMarker, maxParts)
 	if err != nil {
 		return lpi, err
 	}
 	lpi = minio.FromMinioClientListPartsInfo(result)
+	// replace bucket/object/uploadID
+	lpi.UploadID = uploadID
+	lpi.Bucket = bucket
+	lpi.Object = object
 	if lpi.IsTruncated && maxParts > len(lpi.Parts) {
 		partNumberMarker = lpi.NextPartNumberMarker
 		for {
-			result, err = s.client.ListObjectParts(ctx, pBucket, pObject, uploadID, partNumberMarker, maxParts)
+			result, err = s.client.ListObjectParts(ctx, pBucket, pObject, pUploadID, partNumberMarker, maxParts)
 			if err != nil {
 				return lpi, err
 			}
-
 			nlpi := minio.FromMinioClientListPartsInfo(result)
-
 			partNumberMarker = nlpi.NextPartNumberMarker
-
 			lpi.Parts = append(lpi.Parts, nlpi.Parts...)
 			if !nlpi.IsTruncated {
 				break
@@ -224,22 +236,24 @@ func (s *S3) ListObjectParts(ctx context.Context, pBucket string, pObject string
 }
 
 // AbortMultipartUpload xxx
-func (s *S3) AbortMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, opts minio.ObjectOptions) error {
-	err := s.client.AbortMultipartUpload(ctx, pBucket, pObject, uploadID)
-	return minio.ErrorRespToObjectError(err, bucket, object)
+func (s *S3) AbortMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string,
+	object string, uploadID string, opts minio.ObjectOptions) error {
+	return s.client.AbortMultipartUpload(ctx, pBucket, pObject, uploadID)
 }
 
 // CompleteMultipartUpload xxx
-func (s *S3) CompleteMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string, uploadID string, uploadedParts []minio.CompletePart, opts minio.ObjectOptions) (oi minio.ObjectInfo, e error) {
-	etag, err := s.client.CompleteMultipartUpload(ctx, pBucket, pObject, uploadID, minio.ToMinioClientCompleteParts(uploadedParts), miniogo.PutObjectOptions{})
+func (s *S3) CompleteMultipartUpload(ctx context.Context, pBucket string, pObject string, bucket string, object string,
+	uploadID string, uploadedParts []minio.CompletePart, opts minio.ObjectOptions) (oi minio.ObjectInfo, e error) {
+	etag, err := s.client.CompleteMultipartUpload(ctx, pBucket, pObject, uploadID,
+		minio.ToMinioClientCompleteParts(uploadedParts), miniogo.PutObjectOptions{})
 	if err != nil {
-		return oi, minio.ErrorRespToObjectError(err, bucket, object)
+		return oi, err
 	}
-	cmdObjInfo, err := s.client.StatObject(ctx, pBucket, pObject, miniogo.StatObjectOptions{})
+	objInfo, err := s.client.StatObject(ctx, pBucket, pObject, miniogo.StatObjectOptions{})
 	if err != nil {
-		return oi, minio.ErrorRespToObjectError(err, bucket, object)
+		return oi, err
 	}
-	oi = minio.FromMinioClientObjectInfo(bucket, cmdObjInfo)
+	oi = minio.FromMinioClientObjectInfo(bucket, objInfo)
 	// replace pobject with object
 	oi.Name = object
 	cmuEtag := strings.Trim(etag, "\"")

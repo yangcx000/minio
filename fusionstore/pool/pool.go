@@ -13,14 +13,26 @@ import (
 	"github.com/minio/minio/protos"
 )
 
-// vendors
+// Constants of pool
 const (
+	// vendor type
 	VendorUnknown = "unknown"
 	VendorBaidu   = "bos"
 	VendorAws     = "s3"
 	VendorCeph    = "rgw"
+
+	// pool status
+	poolStatusUnknown = "unknown"
+	poolStatusActive  = "active"
+	poolStatusStandby = "standby"
+
+	// bucket status
+	bucketStatusUnknown = "unknown"
+	bucketStatusActive  = "active"
+	bucketStatusStandby = "standby"
 )
 
+// global bucket index
 var bucketIndex uint64
 
 // Bucket xxx
@@ -92,16 +104,23 @@ func (p *Pool) init() error {
 	if resp.GetStatus().Code != protos.Code_OK {
 		return fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
-	p.Buckets = make([]*Bucket, len(resp.GetBucketList()))
-	for i, v := range resp.GetBucketList() {
+	for _, v := range resp.GetBucketList() {
 		b := &Bucket{}
 		b.DecodeFromPb(v)
-		p.Buckets[i] = b
+		// FIXME(yangchunxin): filter active buckets
+		if b.Status != bucketStatusActive {
+			continue
+		}
+		p.Buckets = append(p.Buckets, b)
 	}
 	return nil
 }
 
 func (p *Pool) allocBucket() string {
+	// no bucket
+	if len(p.Buckets) == 0 {
+		return ""
+	}
 	// rr algorithm
 	counter := atomic.AddUint64(&bucketIndex, 1)
 	index := counter % uint64(len(p.Buckets))
@@ -136,6 +155,10 @@ func (m *Mgr) loadPools() error {
 	for _, v := range resp.GetPoolList() {
 		p := &Pool{}
 		p.DecodeFromPb(v)
+		// filter active pools
+		if p.Status != poolStatusActive {
+			continue
+		}
 		if err = p.init(); err != nil {
 			return err
 		}
@@ -164,9 +187,6 @@ func (m *Mgr) AllocatePool(vbucket string) string {
 func (m *Mgr) AllocBucket(pID string) string {
 	p, exists := m.pools[pID]
 	if !exists {
-		return ""
-	}
-	if len(p.Buckets) == 0 {
 		return ""
 	}
 	return p.allocBucket()

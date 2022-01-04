@@ -20,21 +20,24 @@ import (
 
 const (
 	scanLimits = 1000
+	// vbucket status
+	vbucketStatusUnknown = "unknown"
+	vbucketStatusActive  = "active"
+	vbucketStatusStandby = "standby"
 )
 
 // VBucket xxx
 type VBucket struct {
-	ID          string                    `json:"id,omitempty"`
-	Name        string                    `json:"name"`
-	Status      string                    `json:"status,omitempty"`
-	Owner       string                    `json:"owner,omitempty"`
-	Pool        string                    `json:"pool,omitempty"`
-	Mds         string                    `json:"mds,omitempty"`
-	Location    string                    `json:"location,omitempty"`
-	Version     int                       `json:"version,omitempty"`
-	Objects     map[string]*object.Object `json:"objects,omitempty"`
-	CreatedTime time.Time                 `json:"created_time,omitempty"`
-	UpdatedTime time.Time                 `json:"updated_time,omitempty"`
+	ID          string    `json:"id,omitempty"`
+	Name        string    `json:"name"`
+	Status      string    `json:"status,omitempty"`
+	Owner       string    `json:"owner,omitempty"`
+	Pool        string    `json:"pool,omitempty"`
+	Mds         string    `json:"mds,omitempty"`
+	Location    string    `json:"location,omitempty"`
+	Version     int       `json:"version,omitempty"`
+	CreatedTime time.Time `json:"created_time,omitempty"`
+	UpdatedTime time.Time `json:"updated_time,omitempty"`
 }
 
 // DecodeFromPb xxx
@@ -51,21 +54,14 @@ func (v *VBucket) DecodeFromPb(p *protos.VBucket) {
 	v.UpdatedTime = p.GetUpdatedTime().AsTime()
 }
 
-func (v *VBucket) getObject(object string) *object.Object {
-	obj, exists := v.Objects[object]
-	if exists {
-		return obj
-	}
-	// XXX
-	return nil
-}
-
 // Mgr xxx
 type Mgr struct {
 	MdsMgr *mds.Mgr
 	// name --> vbucket
 	VBuckets map[string]*VBucket
 	sync.RWMutex
+	// id ---> multipart
+	Multiparts sync.Map //sync.Map[string]*multipart.Multipart
 }
 
 // NewMgr xxx
@@ -136,6 +132,10 @@ func (m *Mgr) listVBuckets() ([]*VBucket, error) {
 	for i, v := range resp.GetVbuckets() {
 		vb := &VBucket{}
 		vb.DecodeFromPb(v)
+		// filter active vbucket
+		if vb.Status != vbucketStatusActive {
+			continue
+		}
 		vbs[i] = vb
 	}
 	return vbs, nil
@@ -213,9 +213,6 @@ func (m *Mgr) listObjects(lop *object.ListObjectsParam) (*object.ListObjectsResu
 	if err != nil {
 		return nil, err
 	}
-	if resp.GetStatus().Code != protos.Code_OK {
-		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
-	}
 	lor := &object.ListObjectsResult{
 		CommonPrefixs: resp.GetCommonPrefixs(),
 		NextMarker:    resp.GetNextMarker(),
@@ -260,9 +257,6 @@ func (m *Mgr) getMultipart(vbucket, uploadID string) (*multipart.Multipart, erro
 		return nil, err
 	}
 	if resp.GetStatus().Code != protos.Code_OK {
-		if resp.GetStatus().Code == protos.Code_NOT_FOUND {
-			return nil, nil
-		}
 		return nil, fmt.Errorf("%s", resp.GetStatus().GetMsg())
 	}
 	mp := &multipart.Multipart{}
@@ -378,6 +372,7 @@ func (m *Mgr) GetVBucket(vbucket string) *VBucket {
 	if vb != nil {
 		return vb
 	}
+	// FIXME(yangchunxin): print err log
 	vb, _ = m.queryVBucket(vbucket)
 	if vb == nil {
 		return nil
@@ -437,20 +432,36 @@ func (m *Mgr) CreateMultipart(pID, pBucket, pObject, bucket, object, physicalUpl
 		Object:           object,
 		CreatedTime:      time.Now(),
 	}
-	return m.createMultipart(mp)
+	uploadID, err := m.createMultipart(mp)
+	if err == nil {
+		mp.UploadID = uploadID
+		m.addMultipart(mp)
+	}
+	return uploadID, err
 }
 
 // QueryMultipart xxx
 func (m *Mgr) QueryMultipart(bucket, uploadID string) (*multipart.Multipart, error) {
+	mp, exists := m.Multiparts.Load(fmt.Sprintf("%s/%s", bucket, uploadID))
+	if exists {
+		mt, _ := mp.(*multipart.Multipart)
+		return mt, nil
+	}
 	return m.getMultipart(bucket, uploadID)
 }
 
 //DeleteMultipart xxx
 func (m *Mgr) DeleteMultipart(bucket, uploadID string) error {
+	m.Multiparts.Delete(fmt.Sprintf("%s/%s", bucket, uploadID))
 	return m.deleteMultipart(bucket, uploadID)
+}
+
+func (m *Mgr) addMultipart(mp *multipart.Multipart) {
+	m.Multiparts.Store(fmt.Sprintf("%s/%s", mp.VBucket, mp.UploadID), mp)
 }
 
 // AllocateMds xxx
 func (m *Mgr) AllocateMds(vbucket string) string {
+	// no use
 	return m.MdsMgr.AllocateMds(vbucket)
 }

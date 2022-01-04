@@ -27,7 +27,10 @@ type Service struct {
 // NewService xxx
 func NewService(mgsAddr string, timeout int) (err error) {
 	GlobalService = &Service{timeout: time.Duration(timeout) * time.Second}
-	opts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithBlock()}
+	opts := []grpc.DialOption{
+		grpc.WithInsecure(), grpc.WithBlock(),
+		grpc.WithTimeout(time.Duration(timeout) * time.Second),
+	}
 	if GlobalService.conn, err = grpc.Dial(mgsAddr, opts...); err != nil {
 		return err
 	}
@@ -73,7 +76,7 @@ func (s *Service) CreateVBucket(name, location, pool, mds string) (*protos.Creat
 			Mds:      mds,
 			Location: location,
 			// FIXME(yangchunxin): xxx
-			Owner: "li",
+			Owner: "liauto",
 		},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
