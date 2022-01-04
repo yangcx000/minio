@@ -60,6 +60,8 @@ type Mgr struct {
 	// name --> vbucket
 	VBuckets map[string]*VBucket
 	sync.RWMutex
+	// id ---> multipart
+	Multiparts sync.Map //sync.Map[string]*multipart.Multipart
 }
 
 // NewMgr xxx
@@ -430,17 +432,32 @@ func (m *Mgr) CreateMultipart(pID, pBucket, pObject, bucket, object, physicalUpl
 		Object:           object,
 		CreatedTime:      time.Now(),
 	}
-	return m.createMultipart(mp)
+	uploadID, err := m.createMultipart(mp)
+	if err == nil {
+		mp.UploadID = uploadID
+		m.addMultipart(mp)
+	}
+	return uploadID, err
 }
 
 // QueryMultipart xxx
 func (m *Mgr) QueryMultipart(bucket, uploadID string) (*multipart.Multipart, error) {
+	mp, exists := m.Multiparts.Load(fmt.Sprintf("%s/%s", bucket, uploadID))
+	if exists {
+		mt, _ := mp.(*multipart.Multipart)
+		return mt, nil
+	}
 	return m.getMultipart(bucket, uploadID)
 }
 
 //DeleteMultipart xxx
 func (m *Mgr) DeleteMultipart(bucket, uploadID string) error {
+	m.Multiparts.Delete(fmt.Sprintf("%s/%s", bucket, uploadID))
 	return m.deleteMultipart(bucket, uploadID)
+}
+
+func (m *Mgr) addMultipart(mp *multipart.Multipart) {
+	m.Multiparts.Store(fmt.Sprintf("%s/%s", mp.VBucket, mp.UploadID), mp)
 }
 
 // AllocateMds xxx
