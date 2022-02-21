@@ -87,7 +87,7 @@ func commitTime() time.Time {
 		err        error
 	)
 	cmdName := "git"
-	cmdArgs := []string{"log", "--format=%cI", "-n1"}
+	cmdArgs := []string{"log", "--format=%cD", "-n1"}
 	if commitUnix, err = exec.Command(cmdName, cmdArgs...).Output(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error generating git commit-time: ", err)
 		os.Exit(1)
@@ -103,12 +103,14 @@ func commitTime() time.Time {
 }
 
 func main() {
-	var version string
-	if len(os.Args) > 1 {
-		version = os.Args[1]
-	} else {
-		version = commitTime().Format(time.RFC3339)
-	}
+	/*
+		var version string
+		if len(os.Args) > 1 {
+			version = os.Args[1]
+		} else {
+			version = commitTime().Format(time.RFC3339)
+		}
 
-	fmt.Println(genLDFlags(version))
+		fmt.Println(genLDFlags(version))
+	*/
 }
